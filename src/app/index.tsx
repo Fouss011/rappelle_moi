@@ -1,98 +1,112 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
+import { HeroCard } from '../components/HeroCard';
+import { HomeMenu } from '../components/HomeMenu';
+import { MemoryAssistantSheet } from '../components/MemoryAssistantSheet';
+import { NextReminderCard } from '../components/NextReminderCard';
+import { QuickCaptureCard } from '../components/QuickCaptureCard';
+import { RecentNotesPreview } from '../components/RecentNotesPreview';
+import { useAuth } from '../context/AuthContext';
+import { useNotes } from '../context/NotesContext';
+import { registerForPushNotificationsAsync } from '../services/pushService';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function HomeScreen() {
+  const { user, profile, loading } = useAuth();
+  const [memoryOpen, setMemoryOpen] = useState(false);
+
+  const {
+    note,
+    setNote,
+    addNote,
+    scheduledReminders,
+    pendingNotes,
+  } = useNotes();
+
+  useEffect(() => {
+    const setupNotifications = async () => {
+      const permission = await Notifications.requestPermissionsAsync();
+
+      if (permission.granted) {
+        const pushToken = await registerForPushNotificationsAsync();
+        console.log('TOKEN PUSH UTILISATEUR:', pushToken);
+      }
+    };
+
+    setupNotifications();
+  }, []);
+  useEffect(() => {
+  if (!loading && !user) {
+    router.replace('/login' as any);
+  }
+}, [loading, user]);
+
+  const nextReminder = scheduledReminders[0];
+
+  if (loading) {
+  return null;
+}
+
+if (!user) {
+  return null;
+}
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={styles.container}>
+      <HomeMenu
+        onOpenNotes={() => router.push('/notes')}
+        onOpenReminders={() => router.push('/reminders')}
+        onOpenArchives={() => router.push('/archives')}
+        onOpenSettings={() => router.push('/settings')}
+      />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <HeroCard
+          userName={profile?.first_name || user.email?.split('@')[0] || 'Utilisateur'}
+        />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        <QuickCaptureCard note={note} setNote={setNote} onAddNote={addNote} />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <NextReminderCard reminder={nextReminder} />
+
+        <RecentNotesPreview notes={pendingNotes} />
+        
+      </ScrollView>
+
+      <FloatingMemoryButton onPress={() => setMemoryOpen(true)} />
+
+      <MemoryAssistantSheet
+        visible={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#F6F8FC',
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  content: {
+    padding: 22,
+    paddingTop: 82,
+    paddingBottom: 42,
   },
 });

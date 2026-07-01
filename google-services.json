@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "425735348634",
+    "project_id": "rappellemoi",
+    "storage_bucket": "rappellemoi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:425735348634:android:c91477267af6475a5d9a23",
+        "android_client_info": {
+          "package_name": "com.fousseni.rappellemoi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5M433gMGYQrI7wOpD8xwc4G7wT57avIs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
