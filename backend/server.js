@@ -25,6 +25,5 @@ const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
   console.log(`Serveur lancé sur http://${HOST}:${PORT}`);
-  console.log(`Accès réseau local : http://192.168.1.16:${PORT}`);
   startScheduler();
 });
