@@ -28,6 +28,7 @@ type NotesContextValue = {
   note: string;
   setNote: (text: string) => void;
   notes: Note[];
+  saving: boolean;
   addNote: () => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   toggleDone: (id: string) => void;
@@ -102,36 +103,61 @@ async function scheduleReminderNotification(text: string, reminderDate: Date) {
   return notificationId;
 }
 
-async function scheduleDailySummaryNotification() {
+function buildMorningText(notes: Note[]) {
+  const pending = notes.filter((item) => !item.isDone).slice(0, 3);
+
+  if (pending.length === 0) {
+    return 'Bonjour, aucune priorité en attente. Tu peux ajouter tes idées du jour.';
+  }
+
+  return `Bonjour, tes priorités : ${pending
+    .map((item) => item.text)
+    .join(' • ')}`;
+}
+
+function buildEveningText(notes: Note[]) {
+  const doneCount = notes.filter((item) => item.isDone).length;
+  const pendingCount = notes.filter((item) => !item.isDone).length;
+
+  return `Bilan du jour : ${doneCount} terminée(s), ${pendingCount} encore en attente.`;
+}
+
+async function scheduleDailySummaryNotification(notes: Note[]) {
   if (Platform.OS === 'web') return;
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'RappelleMoi',
-      body: 'Ton résumé du jour est prêt. Prends 2 minutes pour faire le point.',
-      sound: true,
-    },
+  title: 'RappelleMoi',
+  body: buildEveningText(notes),
+  sound: true,
+  data: {
+    kind: 'daily_evening',
+  },
+},
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: 21,
-      minute: 45,
+      minute: 0,
     },
   });
 }
 
-async function scheduleMorningReminderNotification() {
+async function scheduleMorningReminderNotification(notes: Note[]) {
   if (Platform.OS === 'web') return;
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'RappelleMoi',
-      body: 'Regarde tes priorités du jour et les choses à ne pas oublier.',
-      sound: true,
-    },
+  title: 'RappelleMoi',
+  body: buildMorningText(notes),
+  sound: true,
+  data: {
+    kind: 'daily_morning',
+  },
+},
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 21,
-      minute: 45,
+      hour: 8,
+      minute: 0,
     },
   });
 }
@@ -140,6 +166,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
   
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [saving, setSaving] = useState(false);
   const { user } = useAuth();
 
   const saveNoteToSupabase = async (note: Note) => {
@@ -179,12 +206,29 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
 }, [user]);
 
   useEffect(() => {
-  if (Platform.OS === 'web') return;
+  const setupDailyNotifications = async () => {
+    if (Platform.OS === 'web') return;
 
-  scheduleMorningReminderNotification();
-  scheduleDailySummaryNotification();
+    const existing = await Notifications.getAllScheduledNotificationsAsync();
 
-}, []);
+    const dailyIds = existing
+      .filter(
+        (item) =>
+          item.content.data?.kind === 'daily_morning' ||
+          item.content.data?.kind === 'daily_evening'
+      )
+      .map((item) => item.identifier);
+
+    await Promise.all(
+      dailyIds.map((id) => Notifications.cancelScheduledNotificationAsync(id))
+    );
+
+    await scheduleMorningReminderNotification(notes);
+    await scheduleDailySummaryNotification(notes);
+  };
+
+  setupDailyNotifications();
+}, [notes]);
 
 
   const loadNotes = async () => {
@@ -229,7 +273,11 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
 };
 
   const addNote = async () => {
-    if (!note.trim()) return;
+  if (!note.trim() || saving) return;
+
+  setSaving(true);
+
+  try {
 
     const cleanText = note.trim();
     const aiAnalysis = await analyseNoteWithAI(cleanText);
@@ -296,10 +344,13 @@ if (aiAnalysis?.type === 'reminder' && aiAnalysis.date && aiAnalysis.time) {
       notificationId: notificationId ?? undefined,
     };
 
-    setNotes((currentNotes) => [newNote, ...currentNotes]);
+        setNotes((currentNotes) => [newNote, ...currentNotes]);
     await saveNoteToSupabase(newNote);
     setNote('');
-  };
+  } finally {
+    setSaving(false);
+  }
+};
 
   const deleteNote = async (id: string) => {
   setNotes((current) => current.filter((n) => n.id !== id));
@@ -391,6 +442,7 @@ if (aiAnalysis?.type === 'reminder' && aiAnalysis.date && aiAnalysis.time) {
         note,
         setNote,
         notes,
+        saving,
         addNote,
         deleteNote,
         toggleDone,

@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import { AppState, Platform, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
 
 import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
 import { HeroCard } from '../components/HeroCard';
@@ -24,13 +24,14 @@ Notifications.setNotificationHandler({
 });
 
 export default function HomeScreen() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const [memoryOpen, setMemoryOpen] = useState(false);
 
   const {
     note,
     setNote,
     addNote,
+    saving,
     scheduledReminders,
     pendingNotes,
   } = useNotes();
@@ -77,6 +78,18 @@ export default function HomeScreen() {
   }
 }, [loading, user]);
 
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', async (state) => {
+    if (state === 'active') {
+      await refreshProfile();
+    }
+  });
+
+  return () => {
+    subscription.remove();
+  };
+}, [refreshProfile]);
+
   const nextReminder = scheduledReminders[0];
 
   if (loading) {
@@ -104,7 +117,12 @@ if (!user) {
           userName={profile?.first_name || user.email?.split('@')[0] || 'Utilisateur'}
         />
 
-        <QuickCaptureCard note={note} setNote={setNote} onAddNote={addNote} />
+        <QuickCaptureCard
+  note={note}
+  setNote={setNote}
+  onAddNote={addNote}
+  loading={saving}
+/>
 
         <NextReminderCard reminder={nextReminder} />
 

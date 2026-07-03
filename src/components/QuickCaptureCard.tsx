@@ -16,13 +16,16 @@ import {
 type QuickCaptureCardProps = {
   note: string;
   setNote: (text: string) => void;
-  onAddNote: () => void;
+  onAddNote: () => Promise<void>;
+  loading: boolean;
 };
+
 
 export function QuickCaptureCard({
   note,
   setNote,
   onAddNote,
+  loading,
 }: QuickCaptureCardProps) {
   const [isListening, setIsListening] = useState(false);
 
@@ -101,12 +104,18 @@ export function QuickCaptureCard({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.saveButton, !note.trim() && styles.saveButtonDisabled]}
-          onPress={onAddNote}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.saveText}>Sauvegarder</Text>
-        </TouchableOpacity>
+  style={[
+    styles.saveButton,
+    (!note.trim() || loading) && styles.saveButtonDisabled,
+  ]}
+  disabled={!note.trim() || loading}
+  onPress={onAddNote}
+  activeOpacity={0.85}
+>
+  <Text style={styles.saveText}>
+    {loading ? 'Sauvegarde...' : 'Sauvegarder'}
+  </Text>
+</TouchableOpacity>
       </View>
     </View>
   );
