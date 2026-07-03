@@ -1,5 +1,8 @@
-import Voice from '@react-native-voice/voice';
-import { useEffect, useState } from 'react';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
+import { useState } from 'react';
 import {
   Alert,
   Platform,
@@ -23,67 +26,46 @@ export function QuickCaptureCard({
 }: QuickCaptureCardProps) {
   const [isListening, setIsListening] = useState(false);
 
-  useEffect(() => {
-  if (Platform.OS === 'web' || !Voice) {
-    return;
-  }
+  useSpeechRecognitionEvent('start', () => setIsListening(true));
+  useSpeechRecognitionEvent('end', () => setIsListening(false));
 
-  Voice.onSpeechStart = () => {
-    setIsListening(true);
-  };
-
-  Voice.onSpeechEnd = () => {
+  useSpeechRecognitionEvent('error', () => {
     setIsListening(false);
-  };
+    Alert.alert('Erreur micro', 'Impossible de récupérer la voix.');
+  });
 
-  Voice.onSpeechError = () => {
-    setIsListening(false);
-    Alert.alert(
-      'Erreur micro',
-      'Impossible de récupérer la voix. Vérifie que le micro est autorisé.'
-    );
-  };
-
-  Voice.onSpeechResults = (event) => {
-    const transcript = event.value?.[0];
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results?.[0]?.transcript;
 
     if (transcript) {
       setNote(note ? `${note} ${transcript}` : transcript);
     }
-  };
-
-  return () => {
-    Voice.destroy().then(Voice.removeAllListeners);
-  };
-}, [note, setNote]);
+  });
 
   const startListening = async () => {
-    try {
-      await Voice.start('fr-FR');
-    } catch (error) {
-      setIsListening(false);
-      Alert.alert(
-        'Micro indisponible',
-        'Impossible de démarrer la reconnaissance vocale.'
-      );
+    const permission =
+      await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Micro refusé', 'Autorise le micro pour utiliser la dictée.');
+      return;
     }
+
+    ExpoSpeechRecognitionModule.start({
+      lang: 'fr-FR',
+      interimResults: false,
+      continuous: false,
+    });
   };
 
   const stopListening = async () => {
-    try {
-      await Voice.stop();
-      setIsListening(false);
-    } catch (error) {
-      setIsListening(false);
-    }
+    ExpoSpeechRecognitionModule.stop();
+    setIsListening(false);
   };
 
   const handleVoicePress = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert(
-        'Micro mobile',
-        'Le micro natif fonctionne sur Android/iOS. Sur web, on gardera une solution différente.'
-      );
+      Alert.alert('Micro mobile', 'Le micro sera testé dans l’APK Android.');
       return;
     }
 
@@ -144,7 +126,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     elevation: 5,
   },
-
   question: {
     fontSize: 24,
     fontWeight: '900',
@@ -152,7 +133,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     letterSpacing: -0.4,
   },
-
   input: {
     minHeight: 118,
     backgroundColor: '#F8FBFF',
@@ -167,13 +147,11 @@ const styles = StyleSheet.create({
     borderColor: '#E6ECF5',
     fontWeight: '700',
   },
-
   actions: {
     marginTop: 14,
     flexDirection: 'row',
     gap: 12,
   },
-
   voiceButton: {
     flex: 1,
     height: 56,
@@ -184,22 +162,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   voiceButtonActive: {
     backgroundColor: '#FEF2F2',
     borderColor: '#FCA5A5',
   },
-
   voiceText: {
     fontSize: 15,
     fontWeight: '900',
     color: '#EA580C',
   },
-
   voiceTextActive: {
     color: '#DC2626',
   },
-
   saveButton: {
     flex: 1.35,
     height: 56,
@@ -213,11 +187,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 5,
   },
-
   saveButtonDisabled: {
     opacity: 0.45,
   },
-
   saveText: {
     color: '#FFFFFF',
     fontSize: 15,
