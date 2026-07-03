@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import { Platform, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
 
 import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
 import { HeroCard } from '../components/HeroCard';
@@ -36,17 +36,41 @@ export default function HomeScreen() {
   } = useNotes();
 
   useEffect(() => {
-    const setupNotifications = async () => {
-      const permission = await Notifications.requestPermissionsAsync();
+  const setupNotifications = async () => {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'RappelleMoi',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: 'default',
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#2563EB',
+      });
+    }
 
-      if (permission.granted) {
-        const pushToken = await registerForPushNotificationsAsync();
-        console.log('TOKEN PUSH UTILISATEUR:', pushToken);
-      }
-    };
+    const permission = await Notifications.requestPermissionsAsync();
 
-    setupNotifications();
-  }, []);
+    if (permission.granted) {
+      const pushToken = await registerForPushNotificationsAsync();
+      console.log('TOKEN PUSH UTILISATEUR:', pushToken);
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Test RappelleMoi',
+          body: 'Si tu vois ça, les notifications marchent.',
+          sound: 'default',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 10,
+          channelId: 'default',
+        },
+      });
+    }
+  };
+
+  setupNotifications(); // ← IL MANQUE CETTE LIGNE
+
+}, []);
   useEffect(() => {
   if (!loading && !user) {
     router.replace('/login' as any);

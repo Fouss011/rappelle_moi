@@ -66,16 +66,30 @@ function detectReminderTime(text: string) {
 async function scheduleReminderNotification(text: string, notifyDate: Date) {
   if (Platform.OS === 'web') return null;
 
+  const now = Date.now();
+
+  if (notifyDate.getTime() <= now) {
+    console.log('Notification ignorée car date passée:', notifyDate);
+    return null;
+  }
+
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: 'RappelleMoi',
       body: text,
-      sound: true,
+      sound: 'default',
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: notifyDate,
+      channelId: 'default',
     },
+  });
+
+  console.log('Notification programmée:', {
+    text,
+    notifyDate: notifyDate.toISOString(),
+    notificationId,
   });
 
   return notificationId;
