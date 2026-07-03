@@ -2,7 +2,7 @@
   "expo": {
     "name": "RappelleMoiV2",
     "slug": "RappelleMoiV2",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rappellemoiv2",
@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "package": "com.fousseni.rappellemoi",
       "permissions": [
