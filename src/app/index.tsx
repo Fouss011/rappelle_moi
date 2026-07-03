@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 22,
-    paddingTop: 105,
+    paddingTop: 90,
     paddingBottom: 42,
   },
 });

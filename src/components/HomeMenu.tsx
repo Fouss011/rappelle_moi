@@ -63,7 +63,11 @@ export function HomeMenu({
 }
 
 const styles = StyleSheet.create({
-  buttonLayer: { position: 'absolute', left: 22, zIndex: 900 },
+  buttonLayer: {
+  position: 'absolute',
+  left: 22,
+  zIndex: 900,
+},
   burgerButton: {
     width: 50, height: 50, borderRadius: 18, backgroundColor: '#FFFFFF',
     borderWidth: 1, borderColor: '#E6ECF5', alignItems: 'center', justifyContent: 'center',
