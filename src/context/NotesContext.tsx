@@ -113,7 +113,7 @@ async function scheduleDailySummaryNotification() {
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 14,
+      hour: 21,
       minute: 45,
     },
   });
@@ -130,7 +130,7 @@ async function scheduleMorningReminderNotification() {
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 16,
+      hour: 21,
       minute: 45,
     },
   });
