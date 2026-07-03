@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
@@ -63,15 +62,22 @@ function detectReminderTime(text: string) {
   return { reminderDate, notifyDate };
 }
 
-async function scheduleReminderNotification(text: string, notifyDate: Date) {
+async function scheduleReminderNotification(text: string, reminderDate: Date) {
   if (Platform.OS === 'web') return null;
 
   const now = Date.now();
 
-  if (notifyDate.getTime() <= now) {
-    console.log('Notification ignorée car date passée:', notifyDate);
+  if (reminderDate.getTime() <= now) {
+    console.log('Rappel ignoré car date passée:', reminderDate);
     return null;
   }
+
+  const tenMinutesBefore = new Date(reminderDate.getTime() - 10 * 60 * 1000);
+
+  const notifyDate =
+    tenMinutesBefore.getTime() > now
+      ? tenMinutesBefore
+      : reminderDate;
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
@@ -88,6 +94,7 @@ async function scheduleReminderNotification(text: string, notifyDate: Date) {
 
   console.log('Notification programmée:', {
     text,
+    reminderDate: reminderDate.toISOString(),
     notifyDate: notifyDate.toISOString(),
     notificationId,
   });
@@ -106,8 +113,8 @@ async function scheduleDailySummaryNotification() {
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 21,
-      minute: 0,
+      hour: 14,
+      minute: 45,
     },
   });
 }
@@ -123,8 +130,8 @@ async function scheduleMorningReminderNotification() {
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 8,
-      minute: 0,
+      hour: 16,
+      minute: 45,
     },
   });
 }
@@ -172,19 +179,11 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
 }, [user]);
 
   useEffect(() => {
-  const setupDailyNotifications = async () => {
-    if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web') return;
 
-    const alreadySet = await AsyncStorage.getItem(DAILY_NOTIFICATIONS_KEY);
+  scheduleMorningReminderNotification();
+  scheduleDailySummaryNotification();
 
-    if (!alreadySet) {
-      await scheduleDailySummaryNotification();
-      await scheduleMorningReminderNotification();
-      await AsyncStorage.setItem(DAILY_NOTIFICATIONS_KEY, 'true');
-    }
-  };
-
-  setupDailyNotifications();
 }, []);
 
 
@@ -256,7 +255,7 @@ if (aiAnalysis?.type === 'reminder' && aiAnalysis.date && aiAnalysis.time) {
 }
 
     const notificationId = detected
-      ? await scheduleReminderNotification(cleanText, detected.notifyDate)
+      ? await scheduleReminderNotification(cleanText, detected.reminderDate)
       : null;
 
     const now = new Date();
@@ -286,7 +285,14 @@ if (aiAnalysis?.type === 'reminder' && aiAnalysis.date && aiAnalysis.time) {
           })
         : undefined,
       reminderAtIso: detected ? detected.reminderDate.toISOString() : undefined,
-      notifyAtIso: detected ? detected.notifyDate.toISOString() : undefined,
+      notifyAtIso: detected
+  ? new Date(
+      Math.max(
+        Date.now(),
+        detected.reminderDate.getTime() - 10 * 60 * 1000
+      )
+    ).toISOString()
+  : undefined,
       notificationId: notificationId ?? undefined,
     };
 
