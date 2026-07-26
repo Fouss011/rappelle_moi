@@ -1,7 +1,14 @@
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, Platform, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
 import { HeroCard } from '../components/HeroCard';
@@ -12,16 +19,6 @@ import { QuickCaptureCard } from '../components/QuickCaptureCard';
 import { RecentNotesPreview } from '../components/RecentNotesPreview';
 import { useAuth } from '../context/AuthContext';
 import { useNotes } from '../context/NotesContext';
-import { registerForPushNotificationsAsync } from '../services/pushService';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 
 export default function HomeScreen() {
   const { user, profile, loading, refreshProfile } = useAuth();
@@ -36,72 +33,56 @@ export default function HomeScreen() {
     pendingNotes,
   } = useNotes();
 
+  /**
+   * Redirige l’utilisateur vers la connexion uniquement
+   * lorsque la restauration de session est terminée.
+   */
   useEffect(() => {
-  const setupNotifications = async () => {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'RappelleMoi',
-        importance: Notifications.AndroidImportance.MAX,
-        sound: 'default',
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2563EB',
-      });
+    if (!loading && !user) {
+      router.replace('/login');
     }
+  }, [loading, user]);
 
-    const permission = await Notifications.requestPermissionsAsync();
-
-    if (permission.granted) {
-      const pushToken = await registerForPushNotificationsAsync();
-      console.log('TOKEN PUSH UTILISATEUR:', pushToken);
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Test RappelleMoi',
-          body: 'Si tu vois ça, les notifications marchent.',
-          sound: 'default',
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 10,
-          channelId: 'default',
-        },
-      });
-    }
-  };
-
-  setupNotifications(); // ← IL MANQUE CETTE LIGNE
-
-}, []);
+  /**
+   * Recharge le prénom de l’utilisateur lorsque l’application
+   * revient au premier plan.
+   */
   useEffect(() => {
-  if (!loading && !user) {
-    router.replace('/login' as any);
-  }
-}, [loading, user]);
-
-useEffect(() => {
-  const subscription = AppState.addEventListener('change', async (state) => {
-    if (state === 'active') {
-      await refreshProfile();
+    if (!user) {
+      return;
     }
-  });
 
-  return () => {
-    subscription.remove();
-  };
-}, [refreshProfile]);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshProfile();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [refreshProfile, user]);
 
   const nextReminder = scheduledReminders[0];
 
+  /**
+   * On n’affiche plus null pendant le chargement.
+   * Cela évite l’écran noir après la connexion ou au redémarrage.
+   */
   if (loading) {
-  return null;
-}
+    return <LoadingScreen message="Chargement de Rappelle Moi..." />;
+  }
 
-if (!user) {
-  return null;
-}
+  /**
+   * Pendant que router.replace() redirige vers /login,
+   * on garde un écran visible au lieu d’un écran noir.
+   */
+  if (!user) {
+    return <LoadingScreen message="Ouverture de la connexion..." />;
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <HomeMenu
         onOpenNotes={() => router.push('/notes')}
         onOpenReminders={() => router.push('/reminders')}
@@ -111,23 +92,27 @@ if (!user) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
       >
         <HeroCard
-          userName={profile?.first_name || user.email?.split('@')[0] || 'Utilisateur'}
+          userName={
+            profile?.first_name ||
+            user.email?.split('@')[0] ||
+            'Utilisateur'
+          }
         />
 
         <QuickCaptureCard
-  note={note}
-  setNote={setNote}
-  onAddNote={addNote}
-  loading={saving}
-/>
+          note={note}
+          setNote={setNote}
+          onAddNote={addNote}
+          loading={saving}
+        />
 
         <NextReminderCard reminder={nextReminder} />
 
         <RecentNotesPreview notes={pendingNotes} />
-        
       </ScrollView>
 
       <FloatingMemoryButton onPress={() => setMemoryOpen(true)} />
@@ -140,6 +125,20 @@ if (!user) {
   );
 }
 
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={styles.loadingContainer}>
+      <View style={styles.loadingCard}>
+        <ActivityIndicator size="large" />
+
+        <Text style={styles.loadingTitle}>Rappelle Moi</Text>
+
+        <Text style={styles.loadingText}>{message}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -147,8 +146,40 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 22,
+    paddingHorizontal: 22,
     paddingTop: 90,
-    paddingBottom: 42,
+    paddingBottom: 110,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#F6F8FC',
+  },
+
+  loadingCard: {
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    backgroundColor: '#FFFFFF',
+  },
+
+  loadingTitle: {
+    marginTop: 18,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#64748B',
   },
 });

@@ -8,15 +8,18 @@
     "scheme": "rappellemoiv2",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": false
     },
     "android": {
       "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "package": "com.fousseni.rappellemoi",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
       ],
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -41,7 +44,14 @@
           }
         }
       ],
-      "expo-speech-recognition"
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-speech-recognition",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

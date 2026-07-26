@@ -1,5 +1,12 @@
 import { Session, User } from '@supabase/supabase-js';
-import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { supabase } from '../services/supabase';
 
@@ -31,44 +38,154 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, first_name')
-      .eq('id', userId)
-      .single();
+  const mountedRef = useRef(true);
 
-    if (!error && data) {
-      setProfile(data);
-    } else {
+  const loadProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      if (error) {
+        console.error('Erreur de chargement du profil :', error.message);
+        setProfile(null);
+        return;
+      }
+
+      setProfile(data ?? null);
+    } catch (error) {
+      console.error('Erreur inattendue pendant le chargement du profil :', error);
+
+      if (mountedRef.current) {
+        setProfile(null);
+      }
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user?.id) {
       setProfile(null);
+      return;
     }
-  };
 
-  const refreshProfile = async () => {
-    if (user?.id) {
-      await loadProfile(user.id);
-    }
-  };
+    await loadProfile(user.id);
+  }, [loadProfile, user?.id]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const currentSession = data.session;
-      const currentUser = currentSession?.user ?? null;
+    mountedRef.current = true;
 
-      setSession(currentSession);
-      setUser(currentUser);
+    async function initializeAuth() {
+      try {
+        const {
+          data: { session: currentSession },
+          error,
+        } = await supabase.auth.getSession();
 
-      if (currentUser?.id) {
-        await loadProfile(currentUser.id);
+        if (!mountedRef.current) {
+          return;
+        }
+
+        if (error) {
+          console.error(
+            'Erreur pendant la restauration de la session :',
+            error.message
+          );
+
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
+        const currentUser = currentSession?.user ?? null;
+
+        setSession(currentSession);
+        setUser(currentUser);
+
+        if (currentUser?.id) {
+          await loadProfile(currentUser.id);
+        } else {
+          setProfile(null);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur inattendue pendant l'initialisation de l'authentification :",
+          error
+        );
+
+        if (mountedRef.current) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
+    }
+
+    void initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      /**
+       * Important :
+       * ne pas lancer directement une requête Supabase asynchrone
+       * dans le callback onAuthStateChange.
+       */
+      const newUser = newSession?.user ?? null;
+
+      setSession(newSession);
+      setUser(newUser);
+
+      if (!newUser?.id) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      /**
+       * On sort la requête de profil du callback Supabase.
+       */
+      setTimeout(() => {
+        if (mountedRef.current) {
+          void loadProfile(newUser.id);
+        }
+      }, 0);
 
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        const newUser = newSession?.user ?? null;
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
+  }, [loadProfile]);
+
+  const signIn = useCallback(
+    async (email: string, password: string): Promise<string | null> => {
+      try {
+        setLoading(true);
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+
+        if (error) {
+          return error.message;
+        }
+
+        const newSession = data.session ?? null;
+        const newUser = data.user ?? null;
 
         setSession(newSession);
         setUser(newUser);
@@ -78,65 +195,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null);
         }
+
+        return null;
+      } catch (error) {
+        console.error('Erreur inattendue pendant la connexion :', error);
+
+        return 'Une erreur inattendue est survenue pendant la connexion.';
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
-    );
+    },
+    [loadProfile]
+  );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+  const signUp = useCallback(
+    async (
+      firstName: string,
+      email: string,
+      password: string
+    ): Promise<string | null> => {
+      try {
+        setLoading(true);
+
+        const cleanFirstName = firstName.trim();
+        const cleanEmail = email.trim().toLowerCase();
+
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+        });
+
+        if (error) {
+          return error.message;
+        }
+
+        const newUser = data.user ?? null;
+        const newSession = data.session ?? null;
+
+        if (!newUser?.id) {
+          return "Le compte a été créé, mais l'utilisateur n'a pas été retourné.";
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(
+            {
+              id: newUser.id,
+              first_name: cleanFirstName,
+            },
+            {
+              onConflict: 'id',
+            }
+          );
+
+        if (profileError) {
+          return profileError.message;
+        }
+
+        setSession(newSession);
+        setUser(newUser);
+        setProfile({
+          id: newUser.id,
+          first_name: cleanFirstName,
+        });
+
+        return null;
+      } catch (error) {
+        console.error(
+          "Erreur inattendue pendant la création du compte :",
+          error
+        );
+
+        return 'Une erreur inattendue est survenue pendant la création du compte.';
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  const signOut = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Erreur pendant la déconnexion :', error.message);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    }
   }, []);
-
-  const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) return error.message;
-
-  if (data.user?.id) {
-    await loadProfile(data.user.id);
-  }
-
-  return null;
-};
-
-  const signUp = async (
-    firstName: string,
-    email: string,
-    password: string
-  ) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) return error.message;
-
-    const newUser = data.user;
-
-    if (newUser?.id) {
-  const { error: profileError } = await supabase.from('profiles').insert({
-    id: newUser.id,
-    first_name: firstName.trim(),
-  });
-
-  if (profileError) return profileError.message;
-
-  setProfile({
-    id: newUser.id,
-    first_name: firstName.trim(),
-  });
-}
-    return null;
-  };
-
-  const signOut = async () => {
-  await supabase.auth.signOut();
-  setSession(null);
-  setUser(null);
-  setProfile(null);
-};
 
   return (
     <AuthContext.Provider
