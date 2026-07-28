@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -36,7 +35,6 @@ export function MemoryAssistantSheet({
   const [loading, setLoading] = useState(false);
 
   const scrollViewRef = useRef<ScrollView | null>(null);
-  const inputRef = useRef<TextInput | null>(null);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -45,36 +43,32 @@ export function MemoryAssistantSheet({
       return;
     }
 
-    /**
-     * Petit délai pour laisser la fenêtre s'afficher avant
-     * d'interagir avec le champ.
-     */
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 150);
+      scrollViewRef.current?.scrollToEnd({
+        animated: false,
+      });
+    }, 100);
 
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [visible]);
 
   useEffect(() => {
-    if (!visible) {
+    if (!visible || messages.length === 0) {
       return;
     }
 
-    /**
-     * Dès qu'un nouveau message apparaît,
-     * la conversation descend automatiquement.
-     */
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollToEnd({
+        animated: true,
+      });
     }, 100);
 
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [messages, loading, visible]);
+    return () => clearTimeout(timer);
+  }, [messages, visible]);
+
+  if (!visible) {
+    return null;
+  }
 
   const handleClose = () => {
     Keyboard.dismiss();
@@ -97,20 +91,21 @@ export function MemoryAssistantSheet({
     ]);
 
     setQuestion('');
-    Keyboard.dismiss();
+    setLoading(true);
 
     try {
-      setLoading(true);
-
-      const response = await fetch(`${API_URL}/api/summary/ask-memory`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: cleanQuestion,
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/api/summary/ask-memory`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            question: cleanQuestion,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -119,7 +114,8 @@ export function MemoryAssistantSheet({
           ...current,
           {
             role: 'assistant',
-            content: "Je n'ai pas réussi à interroger ta mémoire.",
+            content:
+              "Je n'ai pas réussi à interroger ta mémoire.",
           },
         ]);
 
@@ -130,11 +126,15 @@ export function MemoryAssistantSheet({
         ...current,
         {
           role: 'assistant',
-          content: data.answer || 'Aucune réponse trouvée.',
+          content:
+            data.answer || 'Aucune réponse trouvée.',
         },
       ]);
     } catch (error) {
-      console.error("Erreur pendant l'interrogation de la mémoire :", error);
+      console.error(
+        "Erreur pendant l'interrogation de la mémoire :",
+        error
+      );
 
       setMessages((current) => [
         ...current,
@@ -150,180 +150,192 @@ export function MemoryAssistantSheet({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      hardwareAccelerated
-      presentationStyle="overFullScreen"
-      onRequestClose={handleClose}
+    <KeyboardAvoidingView
+      style={styles.overlay}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
     >
-      <KeyboardAvoidingView
-        style={styles.modalContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+      <Pressable
+        style={styles.backdrop}
+        onPress={handleClose}
+      />
+
+      <View
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: Math.max(insets.bottom, 14),
+          },
+        ]}
       >
-        <Pressable style={styles.backdrop} onPress={handleClose} />
+        <View style={styles.handle} />
 
-        <View
-          style={[
-            styles.sheet,
-            {
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
-          ]}
-        >
-          <View style={styles.handle} />
+        <View style={styles.header}>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.title}>Mémoire</Text>
 
-          <View style={styles.header}>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.title}>Mémoire</Text>
-
-              <Text style={styles.subtitle}>
-                Pose une question à tes captures.
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClose}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.closeText}>×</Text>
-            </TouchableOpacity>
+            <Text style={styles.subtitle}>
+              Pose une question à tes captures.
+            </Text>
           </View>
 
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesBox}
-            contentContainerStyle={styles.messagesContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={handleClose}
+            activeOpacity={0.8}
           >
-            {messages.length === 0 ? (
-              <Text style={styles.emptyText}>
-                Pose une question à ta mémoire.
-              </Text>
-            ) : (
-              messages.map((message, index) => (
-                <View
-                  key={`${message.role}-${index}`}
+            <Text style={styles.closeText}>×</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          ref={scrollViewRef}
+          style={[
+            styles.messagesBox,
+            messages.length === 0
+              ? styles.messagesBoxEmpty
+              : styles.messagesBoxFilled,
+          ]}
+          contentContainerStyle={[
+            styles.messagesContent,
+            messages.length === 0 &&
+              styles.emptyMessagesContent,
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              scrollViewRef.current?.scrollToEnd({
+                animated: true,
+              });
+            }
+          }}
+        >
+          {messages.length === 0 ? (
+            <Text style={styles.emptyText}>
+              Tes réponses apparaîtront ici.
+            </Text>
+          ) : (
+            messages.map((message, index) => (
+              <View
+                key={`${message.role}-${index}`}
+                style={[
+                  styles.messageBubble,
+                  message.role === 'user'
+                    ? styles.userBubble
+                    : styles.assistantBubble,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.messageBubble,
+                    styles.messageText,
                     message.role === 'user'
-                      ? styles.userBubble
-                      : styles.assistantBubble,
+                      ? styles.userText
+                      : styles.assistantText,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.messageText,
-                      message.role === 'user'
-                        ? styles.userText
-                        : styles.assistantText,
-                    ]}
-                  >
-                    {message.content}
-                  </Text>
-                </View>
-              ))
+                  {message.content}
+                </Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Pose ta question..."
+            placeholderTextColor="#94A3B8"
+            value={question}
+            onChangeText={setQuestion}
+            multiline
+            scrollEnabled
+            maxLength={500}
+            editable={!loading}
+            textAlignVertical="center"
+            blurOnSubmit={false}
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.askButton,
+              (!question.trim() || loading) &&
+                styles.askButtonDisabled,
+            ]}
+            onPress={() => void askMemory()}
+            disabled={!question.trim() || loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator
+                  size="small"
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.askButtonText}>
+                  Recherche...
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.askButtonText}>
+                Envoyer
+              </Text>
             )}
-
-          </ScrollView>
-
-          <View style={styles.composer}>
-            <TextInput
-              ref={inputRef}
-              style={styles.input}
-              placeholder="Pose une question à ta mémoire..."
-              placeholderTextColor="#94A3B8"
-              value={question}
-              onChangeText={setQuestion}
-              multiline
-              numberOfLines={2}
-              maxLength={500}
-              editable={!loading}
-              textAlignVertical="top"
-              returnKeyType="default"
-              blurOnSubmit={false}
-              onFocus={() => {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 200);
-              }}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.askButton,
-                (!question.trim() || loading) && styles.askButtonDisabled,
-              ]}
-              onPress={() => {
-                void askMemory();
-              }}
-              disabled={!question.trim() || loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.askButtonText}>Envoyer</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 9999,
+    elevation: 9999,
     justifyContent: 'flex-end',
   },
 
   backdrop: {
-  position: 'absolute',
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-  backgroundColor: 'rgba(15, 23, 42, 0.32)',
-},
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.32)',
+  },
 
   sheet: {
     width: '100%',
-    maxHeight: '88%',
-    minHeight: 430,
+    maxHeight: '86%',
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
-    paddingTop: 12,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 10,
+    paddingHorizontal: 18,
     borderWidth: 1,
     borderColor: '#E6ECF5',
-    overflow: 'hidden',
   },
 
   handle: {
-    width: 46,
+    width: 44,
     height: 5,
     borderRadius: 999,
     backgroundColor: '#CBD5E1',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
 
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 12,
   },
 
   headerTextContainer: {
@@ -332,22 +344,22 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 25,
     fontWeight: '900',
     color: '#0F172A',
   },
 
   subtitle: {
-    marginTop: 4,
-    fontSize: 14,
+    marginTop: 3,
+    fontSize: 13,
     fontWeight: '700',
     color: '#64748B',
   },
 
   closeButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 15,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -355,7 +367,7 @@ const styles = StyleSheet.create({
 
   closeText: {
     marginTop: -2,
-    fontSize: 27,
+    fontSize: 26,
     fontWeight: '900',
     color: '#0F172A',
   },
@@ -363,37 +375,48 @@ const styles = StyleSheet.create({
   messagesBox: {
     flexGrow: 0,
     flexShrink: 1,
-    minHeight: 150,
-    maxHeight: 300,
     backgroundColor: '#F8FBFF',
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E6ECF5',
   },
 
+  messagesBoxEmpty: {
+    height: 58,
+  },
+
+  messagesBoxFilled: {
+    minHeight: 90,
+    maxHeight: 260,
+  },
+
   messagesContent: {
+    padding: 12,
+  },
+
+  emptyMessagesContent: {
     flexGrow: 1,
-    padding: 14,
+    justifyContent: 'center',
   },
 
   messageBubble: {
     maxWidth: '90%',
     paddingHorizontal: 13,
-    paddingVertical: 11,
-    borderRadius: 18,
-    marginBottom: 12,
+    paddingVertical: 10,
+    borderRadius: 17,
+    marginBottom: 10,
   },
 
   userBubble: {
     alignSelf: 'flex-end',
     backgroundColor: '#2563EB',
-    borderBottomRightRadius: 6,
+    borderBottomRightRadius: 5,
   },
 
   assistantBubble: {
     alignSelf: 'flex-start',
     backgroundColor: '#EEF2F7',
-    borderBottomLeftRadius: 6,
+    borderBottomLeftRadius: 5,
   },
 
   messageText: {
@@ -411,35 +434,41 @@ const styles = StyleSheet.create({
   },
 
   composer: {
-    paddingTop: 14,
+    paddingTop: 12,
   },
 
   input: {
-  minHeight: 54,
-  maxHeight: 100,
-  backgroundColor: '#F8FBFF',
-  borderRadius: 18,
-  paddingHorizontal: 16,
-  paddingVertical: 14,
-  fontSize: 15,
-  lineHeight: 21,
-  color: '#0F172A',
-  borderWidth: 1,
-  borderColor: '#DCE5F1',
-  fontWeight: '700',
-},
+    height: 52,
+    maxHeight: 86,
+    backgroundColor: '#F8FBFF',
+    borderRadius: 17,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#DCE5F1',
+    fontWeight: '700',
+  },
 
   askButton: {
-    height: 54,
-    borderRadius: 18,
+    height: 52,
+    borderRadius: 17,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
 
   askButtonDisabled: {
-    opacity: 0.45,
+    opacity: 0.48,
+  },
+
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
   },
 
   askButtonText: {
@@ -449,7 +478,7 @@ const styles = StyleSheet.create({
   },
 
   emptyText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#94A3B8',
   },

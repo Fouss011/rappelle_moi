@@ -14,7 +14,7 @@ export function FloatingMemoryButton({ onPress }: Props) {
       <Text style={styles.icon}>🧠</Text>
 
       <Text style={styles.text}>
-        Mémoire
+        Ma mémoire
       </Text>
     </TouchableOpacity>
   );

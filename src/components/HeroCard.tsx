@@ -15,8 +15,9 @@ export function HeroCard({ userName = 'Fousséni' }: HeroCardProps) {
 
   return (
     <View style={styles.container}>
-      <View>
+      <View style={styles.textBlock}>
         <Text style={styles.greeting}>Bonjour, {userName}</Text>
+        <Text style={styles.intro}>Je suis Daya.</Text>
         <Text style={styles.date}>{dateLabel}</Text>
       </View>
 
@@ -41,10 +42,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
+  textBlock: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
   greeting: {
     fontSize: 20,
     fontWeight: '900',
     color: '#0F172A',
+  },
+
+  intro: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2563EB',
   },
 
   date: {

@@ -38,7 +38,7 @@ export default function RootLayout() {
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'Rappels',
-            description: 'Notifications et rappels de Rappelle Moi',
+            description: 'Notifications et rappels de Daya',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             enableVibrate: true,

@@ -134,7 +134,7 @@ export default function SettingsScreen() {
 
         Alert.alert(
           'Notifications bloquées',
-          'Autorise les notifications de Rappelle Moi dans les paramètres du téléphone.'
+          'Autorise les notifications de Daya dans les paramètres du téléphone.'
         );
 
         return;
@@ -151,7 +151,7 @@ export default function SettingsScreen() {
           {
             name: 'Rappels',
             description:
-              'Notifications et rappels de Rappelle Moi',
+              'Notifications et rappels de Daya',
             importance:
               Notifications.AndroidImportance.MAX,
             sound: 'default',
@@ -169,7 +169,7 @@ export default function SettingsScreen() {
       const notificationId =
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Test Rappelle Moi',
+            title: 'Test Daya',
             body: 'Si tu vois ce message, les notifications locales fonctionnent.',
             sound: 'default',
             data: {
@@ -294,7 +294,7 @@ export default function SettingsScreen() {
 
       Alert.alert(
         'Paramètres indisponibles',
-        'Ouvre manuellement Paramètres > Applications > Rappelle Moi > Notifications.'
+        'Ouvre manuellement Paramètres > Applications > Daya > Notifications.'
       );
     }
   };
@@ -323,7 +323,7 @@ export default function SettingsScreen() {
   const permissionDescription = (() => {
     switch (permissionState) {
       case 'granted':
-        return 'Android autorise Rappelle Moi à afficher des notifications.';
+        return 'Android autorise Daya à afficher des notifications.';
 
       case 'denied':
         return 'Android bloque actuellement les notifications de cette application.';

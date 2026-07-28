@@ -33,7 +33,7 @@ function startScheduler() {
     timezone: 'Europe/Paris',
   });
 
-  console.log('⏰ Scheduler Rappelle Moi actif');
+  console.log('⏰ Scheduler Daya actif');
 }
 
 module.exports = {

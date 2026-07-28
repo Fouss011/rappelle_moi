@@ -39,6 +39,7 @@ export function HomeMenu({
             <TouchableOpacity style={styles.closeButton} onPress={() => setOpen(false)}>
               <Text style={styles.closeText}>×</Text>
             </TouchableOpacity>
+            <Text style={styles.brand}>Daya</Text>
 
             <TouchableOpacity style={styles.item} onPress={() => handlePress(onOpenNotes)}>
               <Text style={styles.itemText}>Mes notes</Text>
@@ -88,4 +89,11 @@ const styles = StyleSheet.create({
   item: { paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#EEF2F7' },
   lastItem: { borderBottomWidth: 0 },
   itemText: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  brand: {
+  paddingHorizontal: 16,
+  paddingBottom: 12,
+  fontSize: 22,
+  fontWeight: '900',
+  color: '#2563EB',
+},
 });

@@ -19,6 +19,7 @@ import { QuickCaptureCard } from '../components/QuickCaptureCard';
 import { RecentNotesPreview } from '../components/RecentNotesPreview';
 import { useAuth } from '../context/AuthContext';
 import { useNotes } from '../context/NotesContext';
+import { registerPushTokenForUser } from '../services/pushTokenService';
 
 export default function HomeScreen() {
   const { user, profile, loading, refreshProfile } = useAuth();
@@ -42,6 +43,27 @@ export default function HomeScreen() {
       router.replace('/login');
     }
   }, [loading, user]);
+
+ useEffect(() => {
+  if (!user?.id) {
+    return;
+  }
+
+  const userId = user.id;
+
+  async function registerDevice() {
+    const result = await registerPushTokenForUser(userId);
+
+    if (!result.success) {
+      console.warn(
+        "Le téléphone n'a pas été enregistré pour les push :",
+        result.error
+      );
+    }
+  }
+
+  void registerDevice();
+}, [user?.id]);
 
   /**
    * Recharge le prénom de l’utilisateur lorsque l’application
@@ -70,7 +92,7 @@ export default function HomeScreen() {
    * Cela évite l’écran noir après la connexion ou au redémarrage.
    */
   if (loading) {
-    return <LoadingScreen message="Chargement de Rappelle Moi..." />;
+    return <LoadingScreen message="Chargement de Daya..." />;
   }
 
   /**
@@ -131,7 +153,7 @@ function LoadingScreen({ message }: { message: string }) {
       <View style={styles.loadingCard}>
         <ActivityIndicator size="large" />
 
-        <Text style={styles.loadingTitle}>Rappelle Moi</Text>
+        <Text style={styles.loadingTitle}>Daya</Text>
 
         <Text style={styles.loadingText}>{message}</Text>
       </View>

@@ -168,7 +168,7 @@ async function scheduleReminderNotification(
     const notificationId =
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Rappelle Moi',
+          title: 'Daya',
           body: text,
           sound: 'default',
           data: {
@@ -359,7 +359,7 @@ async function scheduleDailyNotifications(notes: Note[]) {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Rappelle Moi',
+      title: 'Daya',
       body: buildMorningText(notes),
       sound: 'default',
       data: {
@@ -376,7 +376,7 @@ async function scheduleDailyNotifications(notes: Note[]) {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Rappelle Moi',
+      title: 'Daya',
       body: buildEveningText(notes),
       sound: 'default',
       data: {

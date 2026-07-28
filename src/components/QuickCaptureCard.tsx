@@ -82,11 +82,13 @@ export function QuickCaptureCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.question}>Qu’aimerais-tu retenir ?</Text>
+      <Text style={styles.question}>
+        Que souhaites-tu confier à Daya ?
+      </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Écris une idée, une tâche ou un rappel..."
+        placeholder="Une idée, une tâche, un rappel..."
         placeholderTextColor="#94A3B8"
         value={note}
         onChangeText={setNote}
