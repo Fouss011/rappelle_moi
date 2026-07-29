@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { API_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
 type MemoryAssistantSheetProps = {
   visible: boolean;
@@ -33,6 +34,12 @@ export function MemoryAssistantSheet({
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const { profile, user } = useAuth();
+
+const firstName =
+  profile?.first_name ||
+  user?.email?.split('@')[0] ||
+  'toi';
 
   const scrollViewRef = useRef<ScrollView | null>(null);
   const insets = useSafeAreaInsets();
@@ -172,10 +179,10 @@ export function MemoryAssistantSheet({
 
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>Mémoire</Text>
+            <Text style={styles.title}>Mémoire de {firstName}</Text>
 
             <Text style={styles.subtitle}>
-              Pose une question à tes captures.
+              Retrouve une idée, un rappel ou un souvenir enregistré.
             </Text>
           </View>
 

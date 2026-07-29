@@ -1,14 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
@@ -48,9 +48,9 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>RappelleMoi</Text>
+        <Text style={styles.title}>Daya</Text>
         <Text style={styles.subtitle}>
-          Connecte-toi pour retrouver ta mémoire personnelle.
+          Ton assistant personnel pour retenir, retrouver et organiser ce qui compte.
         </Text>
 
         {mode === 'signup' && (
