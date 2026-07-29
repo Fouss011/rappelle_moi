@@ -11,25 +11,40 @@ export type AiNoteAnalysis = {
   confidence: number;
 };
 
-export async function analyseNoteWithAI(text: string): Promise<AiNoteAnalysis | null> {
+export async function analyseNoteWithAI(
+  text: string,
+  accessToken: string
+): Promise<AiNoteAnalysis | null> {
   try {
-    const response = await fetch(`${API_URL}/api/ai/analyse-note`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
-    });
+    const response = await fetch(
+      `${API_URL}/api/ai/analyse-note`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          text,
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok || !data.success) {
+      console.log(data);
+
       return null;
     }
 
     return data.analysis;
   } catch (error) {
-    console.log('Erreur analyse note IA:', error);
+    console.log(
+      'Erreur analyse note IA :',
+      error
+    );
+
     return null;
   }
 }

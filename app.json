@@ -5,7 +5,7 @@
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "RappelleMoiV2",
+    "scheme": "rappellemoiv2",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
@@ -14,7 +14,7 @@
     "android": {
       "versionCode": 2,
       "googleServicesFile": "./google-services.json",
-      "package": "com.fousseni.rappellemoi"
+      "package": "com.fousseni.rappellemoi",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS"
@@ -29,7 +29,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

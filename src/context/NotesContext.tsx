@@ -17,6 +17,7 @@ import { useAuth } from './AuthContext';
 
 export type Note = {
   id: string;
+  title: string;
   text: string;
   createdAt: string;
   createdAtIso: string;
@@ -396,6 +397,16 @@ async function scheduleDailyNotifications(notes: Note[]) {
   );
 }
 
+function generateFallbackTitle(text: string) {
+  const cleanText = text.trim();
+
+  if (cleanText.length <= 45) {
+    return cleanText;
+  }
+
+  return `${cleanText.slice(0, 45).trim()}…`;
+}
+
 function generateNoteId() {
   return `${Date.now()}-${Math.random()
     .toString(36)
@@ -412,7 +423,7 @@ export function NotesProvider({
   const [saving, setSaving] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
 
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   const saveNoteToSupabase = useCallback(
     async (item: Note) => {
@@ -423,7 +434,8 @@ export function NotesProvider({
       const { error } = await supabase.from('notes').upsert({
         id: item.id,
         user_id: user.id,
-
+        
+        title: item.title,
         text: item.text,
 
         created_at: item.createdAt,
@@ -485,6 +497,11 @@ export function NotesProvider({
       const formattedNotes: Note[] =
         data?.map((item) => ({
           id: item.id,
+
+          title:
+            item.title?.trim() ||
+            generateFallbackTitle(item.text),
+
           text: item.text,
           createdAt: item.created_at,
           createdAtIso: item.created_at_iso,
@@ -548,16 +565,21 @@ export function NotesProvider({
     setSaving(true);
 
     try {
-      let aiAnalysis = null;
+  let aiAnalysis = null;
 
-      try {
-        aiAnalysis = await analyseNoteWithAI(cleanText);
-      } catch (error) {
-        console.warn(
-          "L'analyse IA a échoué. La détection locale sera utilisée.",
-          error
-        );
-      }
+  try {
+    if (session?.access_token) {
+      aiAnalysis = await analyseNoteWithAI(
+        cleanText,
+        session.access_token
+      );
+    }
+  } catch (error) {
+    console.warn(
+      "L'analyse IA a échoué. La détection locale sera utilisée.",
+      error
+    );
+  }
 
       const smartReminder = !aiAnalysis
         ? detectSmartReminder(cleanText)
@@ -616,6 +638,11 @@ export function NotesProvider({
 
       const newNote: Note = {
         id: generateNoteId(),
+
+        title:
+          aiAnalysis?.title?.trim() ||
+          generateFallbackTitle(cleanText),
+
         text: cleanText,
 
         createdAt: now.toLocaleTimeString('fr-FR', {
@@ -677,7 +704,13 @@ export function NotesProvider({
     } finally {
       setSaving(false);
     }
-  }, [note, saveNoteToSupabase, saving, user]);
+  }, [
+  note,
+  saveNoteToSupabase,
+  saving,
+  user,
+  session?.access_token,
+]);
 
   const deleteNote = useCallback(
     async (id: string) => {
@@ -868,15 +901,14 @@ export function NotesProvider({
   }, [notes]);
 
   const pendingNotes = useMemo(() => {
-    return notes
-      .filter((item) => !item.isDone)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAtIso).getTime() -
-          new Date(a.createdAtIso).getTime()
-      )
-      .slice(0, 5);
-  }, [notes]);
+  return notes
+    .filter((item) => !item.isDone)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAtIso).getTime() -
+        new Date(a.createdAtIso).getTime()
+    );
+}, [notes]);
 
   return (
     <NotesContext.Provider

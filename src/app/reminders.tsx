@@ -1,126 +1,277 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Note, useNotes } from '../context/NotesContext';
 
-function isSameDay(dateA: Date, dateB: Date) {
-  return dateA.toDateString() === dateB.toDateString();
+type ReminderGroup = {
+  key: string;
+  title: string;
+  date: Date;
+  items: Note[];
+  isOverdue: boolean;
+};
+
+function startOfDay(date: Date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
 }
 
-function Section({
-  title,
-  notes,
-  onDone,
-}: {
-  title: string;
-  notes: Note[];
-  onDone: (id: string) => void;
-}) {
-  if (notes.length === 0) return null;
+function getDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+function getReminderDayLabel(date: Date) {
+  const today = startOfDay(new Date());
 
-      {notes.map((item) => (
-        <View key={item.id} style={styles.card}>
-          <Text style={styles.time}>{item.reminderAt}</Text>
-          <Text style={styles.text}>{item.text}</Text>
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-          <TouchableOpacity style={styles.doneButton} onPress={() => onDone(item.id)}>
-            <Text style={styles.doneText}>Terminer</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </View>
-  );
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const target = startOfDay(date);
+
+  if (target.getTime() === today.getTime()) {
+    return `Aujourd'hui — ${date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    })}`;
+  }
+
+  if (target.getTime() === tomorrow.getTime()) {
+    return `Demain — ${date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    })}`;
+  }
+
+  if (target.getTime() === yesterday.getTime()) {
+    return `Hier — ${date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    })}`;
+  }
+
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year:
+      date.getFullYear() !== today.getFullYear()
+        ? 'numeric'
+        : undefined,
+  });
+}
+
+function formatReminderTime(dateIso: string) {
+  const date = new Date(dateIso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '--:--';
+  }
+
+  return date.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function groupReminders(items: Note[]): ReminderGroup[] {
+  const now = new Date();
+  const groups = new Map<string, ReminderGroup>();
+
+  items.forEach((item) => {
+    if (!item.reminderAtIso) {
+      return;
+    }
+
+    const reminderDate = new Date(item.reminderAtIso);
+
+    if (Number.isNaN(reminderDate.getTime())) {
+      return;
+    }
+
+    const key = getDateKey(reminderDate);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: getReminderDayLabel(reminderDate),
+        date: startOfDay(reminderDate),
+        items: [],
+        isOverdue: reminderDate.getTime() < now.getTime(),
+      });
+    }
+
+    const group = groups.get(key);
+
+    if (group) {
+      group.items.push(item);
+
+      if (reminderDate.getTime() < now.getTime()) {
+        group.isOverdue = true;
+      }
+    }
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((group) => ({
+      ...group,
+      items: group.items.sort(
+        (a, b) =>
+          new Date(a.reminderAtIso ?? '').getTime() -
+          new Date(b.reminderAtIso ?? '').getTime()
+      ),
+    }));
 }
 
 export default function RemindersScreen() {
   const { notes, toggleDone } = useNotes();
 
-  const groups = useMemo(() => {
-    const now = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(now.getDate() + 1);
+  const reminderGroups = useMemo(() => {
+    const activeReminders = notes.filter(
+      (item) =>
+        item.type === 'reminder' &&
+        !item.isDone &&
+        Boolean(item.reminderAtIso)
+    );
 
-    const reminders = notes
-      .filter((item) => item.type === 'reminder' && item.reminderAtIso)
-      .sort(
-        (a, b) =>
-          new Date(a.reminderAtIso || '').getTime() -
-          new Date(b.reminderAtIso || '').getTime()
-      );
-
-    return {
-      overdue: reminders.filter(
-        (item) =>
-          !item.isDone &&
-          new Date(item.reminderAtIso || '').getTime() < now.getTime()
-      ),
-      today: reminders.filter(
-        (item) =>
-          !item.isDone && isSameDay(new Date(item.reminderAtIso || ''), now)
-      ),
-      tomorrow: reminders.filter(
-        (item) =>
-          !item.isDone &&
-          isSameDay(new Date(item.reminderAtIso || ''), tomorrow)
-      ),
-      later: reminders.filter((item) => {
-        const date = new Date(item.reminderAtIso || '');
-        return !item.isDone && date > tomorrow && !isSameDay(date, tomorrow);
-      }),
-      done: reminders.filter((item) => item.isDone),
-    };
+    return groupReminders(activeReminders);
   }, [notes]);
 
-  const total =
-    groups.overdue.length +
-    groups.today.length +
-    groups.tomorrow.length +
-    groups.later.length;
+  const total = reminderGroups.reduce(
+    (sum, group) => sum + group.items.length,
+    0
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Text style={styles.backText}>← Retour</Text>
         </TouchableOpacity>
 
         <Text style={styles.title}>Mes rappels</Text>
+
         <Text style={styles.subtitle}>
-          Tes rappels actifs, en retard et terminés.
+          Tes rappels sont classés selon leur date prévue.
         </Text>
 
         <View style={styles.summary}>
           <Text style={styles.summaryValue}>{total}</Text>
-          <Text style={styles.summaryText}>rappel(s) à suivre</Text>
+
+          <Text style={styles.summaryText}>
+            rappel{total > 1 ? 's' : ''} à suivre
+          </Text>
         </View>
 
-        {total === 0 && groups.done.length === 0 ? (
+        {total === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>Aucun rappel</Text>
+            <Text style={styles.emptyTitle}>
+              Aucun rappel actif
+            </Text>
+
             <Text style={styles.emptyText}>
-              Ajoute une phrase avec une heure, par exemple : “Appeler Rachel à 18h”.
+              Exemple : « Appeler Rachel demain à 18 h ».
             </Text>
           </View>
         ) : (
-          <>
-            <Section title="En retard" notes={groups.overdue} onDone={toggleDone} />
-            <Section title="Aujourd’hui" notes={groups.today} onDone={toggleDone} />
-            <Section title="Demain" notes={groups.tomorrow} onDone={toggleDone} />
-            <Section title="Plus tard" notes={groups.later} onDone={toggleDone} />
-            <Section title="Terminés" notes={groups.done} onDone={toggleDone} />
-          </>
+          reminderGroups.map((group) => (
+            <View key={group.key} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    group.isOverdue &&
+                      styles.overdueSectionTitle,
+                  ]}
+                >
+                  {group.title}
+                </Text>
+
+                <Text style={styles.sectionCount}>
+                  {group.items.length}
+                </Text>
+              </View>
+
+              {group.items.map((item) => {
+                const isOverdue =
+                  item.reminderAtIso &&
+                  new Date(item.reminderAtIso).getTime() <
+                    Date.now();
+
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.card,
+                      isOverdue && styles.overdueCard,
+                    ]}
+                  >
+                    <View style={styles.reminderHeader}>
+                      <Text
+                        style={[
+                          styles.time,
+                          isOverdue && styles.overdueTime,
+                        ]}
+                      >
+                        {formatReminderTime(
+                          item.reminderAtIso ?? ''
+                        )}
+                      </Text>
+
+                      {isOverdue && (
+                        <Text style={styles.overdueBadge}>
+                          En retard
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <Text style={styles.reminderTitle}>
+                      {item.title}
+                    </Text>
+
+                    <Text style={styles.text}>
+                      {item.text}
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.doneButton}
+                      onPress={() =>
+                        void toggleDone(item.id)
+                      }
+                    >
+                      <Text style={styles.doneText}>
+                        Terminer
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
@@ -128,8 +279,16 @@ export default function RemindersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F8FC' },
-  content: { padding: 22, paddingBottom: 40 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F6F8FC',
+  },
+
+  content: {
+    padding: 22,
+    paddingBottom: 50,
+  },
+
   backButton: {
     alignSelf: 'flex-start',
     backgroundColor: '#FFFFFF',
@@ -140,8 +299,19 @@ const styles = StyleSheet.create({
     borderColor: '#E6ECF5',
     marginBottom: 18,
   },
-  backText: { fontSize: 14, fontWeight: '900', color: '#0F172A' },
-  title: { fontSize: 34, fontWeight: '900', color: '#0F172A' },
+
+  backText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
+  title: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
   subtitle: {
     marginTop: 8,
     fontSize: 15,
@@ -149,6 +319,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
   },
+
   summary: {
     marginTop: 20,
     marginBottom: 20,
@@ -158,8 +329,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E6ECF5',
   },
-  summaryValue: { fontSize: 36, fontWeight: '900', color: '#2563EB' },
-  summaryText: { fontSize: 14, fontWeight: '800', color: '#64748B' },
+
+  summaryValue: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#2563EB',
+  },
+
+  summaryText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#64748B',
+  },
+
   emptyBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
@@ -167,7 +349,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E6ECF5',
   },
-  emptyTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
   emptyText: {
     marginTop: 6,
     fontSize: 14,
@@ -175,13 +363,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
   },
-  section: { marginBottom: 18 },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 10,
+
+  section: {
+    marginBottom: 20,
   },
+
+  sectionHeader: {
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  sectionTitle: {
+    flex: 1,
+    paddingRight: 12,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#2563EB',
+    textTransform: 'capitalize',
+  },
+
+  overdueSectionTitle: {
+    color: '#DC2626',
+  },
+
+  sectionCount: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
@@ -190,14 +409,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E6ECF5',
   },
-  time: { fontSize: 24, fontWeight: '900', color: '#2563EB' },
-  text: {
-    marginTop: 8,
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: '800',
-    color: '#0F172A',
+
+  overdueCard: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FFF8F8',
   },
+
+  reminderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  time: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#2563EB',
+  },
+
+  overdueTime: {
+    color: '#DC2626',
+  },
+
+  overdueBadge: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#DC2626',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+
+  reminderTitle: {
+  marginTop: 10,
+  fontSize: 17,
+  lineHeight: 23,
+  fontWeight: '900',
+  color: '#0F172A',
+},
+
+  text: {
+  marginTop: 5,
+  fontSize: 14,
+  lineHeight: 21,
+  fontWeight: '700',
+  color: '#64748B',
+},
+
   doneButton: {
     marginTop: 14,
     alignSelf: 'flex-start',
@@ -206,5 +465,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  doneText: { fontSize: 13, fontWeight: '900', color: '#16A34A' },
+
+  doneText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#16A34A',
+  },
 });

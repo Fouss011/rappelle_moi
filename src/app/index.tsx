@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -85,7 +86,6 @@ export default function HomeScreen() {
     };
   }, [refreshProfile, user]);
 
-  const nextReminder = scheduledReminders[0];
 
   /**
    * On n’affiche plus null pendant le chargement.
@@ -104,47 +104,68 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <HomeMenu
-        onOpenNotes={() => router.push('/notes')}
-        onOpenReminders={() => router.push('/reminders')}
-        onOpenArchives={() => router.push('/archives')}
-        onOpenSettings={() => router.push('/settings')}
-      />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+  <ImageBackground
+    source={require('../../assets/images/background.png')}
+    style={styles.backgroundImage}
+    resizeMode="cover"
+  >
+    <View style={styles.backgroundOverlay}>
+      <SafeAreaView
+        style={styles.container}
+        edges={['top', 'left', 'right']}
       >
-        <HeroCard
-          userName={
-            profile?.first_name ||
-            user.email?.split('@')[0] ||
-            'Utilisateur'
-          }
+        <HomeMenu
+          onOpenNotes={() => router.push('/notes')}
+          onOpenReminders={() => router.push('/reminders')}
+          onOpenArchives={() => router.push('/archives')}
+          onOpenSettings={() => router.push('/settings')}
         />
 
-        <QuickCaptureCard
-          note={note}
-          setNote={setNote}
-          onAddNote={addNote}
-          loading={saving}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+        >
+          <HeroCard
+            userName={
+              profile?.first_name ||
+              user.email?.split('@')[0] ||
+              'Utilisateur'
+            }
+          />
+
+          <QuickCaptureCard
+            note={note}
+            setNote={setNote}
+            onAddNote={addNote}
+            loading={saving}
+          />
+
+          <RecentNotesPreview
+            notes={pendingNotes
+              .filter((item) => item.type === 'note')
+              .slice(0, 2)}
+            onSeeAll={() => router.push('/notes')}
+          />
+
+          <NextReminderCard
+            reminders={scheduledReminders.slice(0, 3)}
+            onSeeAll={() => router.push('/reminders')}
+          />
+        </ScrollView>
+
+        <FloatingMemoryButton
+          onPress={() => setMemoryOpen(true)}
         />
 
-        <NextReminderCard reminder={nextReminder} />
-
-        <RecentNotesPreview notes={pendingNotes} />
-      </ScrollView>
-
-      <FloatingMemoryButton onPress={() => setMemoryOpen(true)} />
-
-      <MemoryAssistantSheet
-        visible={memoryOpen}
-        onClose={() => setMemoryOpen(false)}
-      />
-    </SafeAreaView>
-  );
+        <MemoryAssistantSheet
+          visible={memoryOpen}
+          onClose={() => setMemoryOpen(false)}
+        />
+      </SafeAreaView>
+    </View>
+  </ImageBackground>
+);
 }
 
 function LoadingScreen({ message }: { message: string }) {
@@ -162,10 +183,20 @@ function LoadingScreen({ message }: { message: string }) {
 }
 
 const styles = StyleSheet.create({
+
+  backgroundImage: {
+  flex: 1,
+},
+
+backgroundOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(246, 248, 252, 0.88)',
+},
+
   container: {
-    flex: 1,
-    backgroundColor: '#F6F8FC',
-  },
+  flex: 1,
+  backgroundColor: 'transparent',
+},
 
   content: {
     paddingHorizontal: 22,

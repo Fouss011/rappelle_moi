@@ -34,15 +34,16 @@ export function MemoryAssistantSheet({
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
-  const { profile, user } = useAuth();
 
-const firstName =
-  profile?.first_name ||
-  user?.email?.split('@')[0] ||
-  'toi';
+  const { profile, user, session } = useAuth();
 
   const scrollViewRef = useRef<ScrollView | null>(null);
   const insets = useSafeAreaInsets();
+
+  const firstName =
+    profile?.first_name ||
+    user?.email?.split('@')[0] ||
+    'toi';
 
   useEffect(() => {
     if (!visible) {
@@ -82,10 +83,29 @@ const firstName =
     onClose();
   };
 
+  const addAssistantMessage = (content: string) => {
+    setMessages((current) => [
+      ...current,
+      {
+        role: 'assistant',
+        content,
+      },
+    ]);
+  };
+
   const askMemory = async () => {
     const cleanQuestion = question.trim();
 
     if (!cleanQuestion || loading) {
+      return;
+    }
+
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      addAssistantMessage(
+        'Ta session a expiré. Reconnecte-toi pour interroger ta mémoire.'
+      );
       return;
     }
 
@@ -107,6 +127,7 @@ const firstName =
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             question: cleanQuestion,
@@ -116,41 +137,33 @@ const firstName =
 
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        setMessages((current) => [
-          ...current,
-          {
-            role: 'assistant',
-            content:
-              "Je n'ai pas réussi à interroger ta mémoire.",
-          },
-        ]);
-
+      if (response.status === 401) {
+        addAssistantMessage(
+          'Ta session a expiré. Ferme ta session puis reconnecte-toi.'
+        );
         return;
       }
 
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content:
-            data.answer || 'Aucune réponse trouvée.',
-        },
-      ]);
+      if (!response.ok || !data.success) {
+        addAssistantMessage(
+          data.error ||
+            "Je n'ai pas réussi à interroger ta mémoire."
+        );
+        return;
+      }
+
+      addAssistantMessage(
+        data.answer || 'Aucune réponse trouvée.'
+      );
     } catch (error) {
       console.error(
         "Erreur pendant l'interrogation de la mémoire :",
         error
       );
 
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content:
-            "Impossible de contacter le serveur. Vérifie que le backend est disponible.",
-        },
-      ]);
+      addAssistantMessage(
+        "Impossible de contacter Daya. Vérifie que le backend est disponible."
+      );
     } finally {
       setLoading(false);
     }
@@ -179,7 +192,9 @@ const firstName =
 
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>Mémoire de {firstName}</Text>
+            <Text style={styles.title}>
+              Mémoire de {firstName}
+            </Text>
 
             <Text style={styles.subtitle}>
               Retrouve une idée, un rappel ou un souvenir enregistré.
@@ -269,7 +284,9 @@ const firstName =
               (!question.trim() || loading) &&
                 styles.askButtonDisabled,
             ]}
-            onPress={() => void askMemory()}
+            onPress={() => {
+              void askMemory();
+            }}
             disabled={!question.trim() || loading}
             activeOpacity={0.85}
           >
