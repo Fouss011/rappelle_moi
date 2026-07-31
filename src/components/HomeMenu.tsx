@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type HomeMenuProps = {
   onOpenNotes: () => void;
   onOpenReminders: () => void;
+  onOpenMemory: () => void;
   onOpenArchives: () => void;
   onOpenSettings: () => void;
 };
@@ -12,6 +19,7 @@ type HomeMenuProps = {
 export function HomeMenu({
   onOpenNotes,
   onOpenReminders,
+  onOpenMemory,
   onOpenArchives,
   onOpenSettings,
 }: HomeMenuProps) {
@@ -25,36 +33,98 @@ export function HomeMenu({
 
   return (
     <>
-      <View style={[styles.buttonLayer, { top: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.burgerButton} onPress={() => setOpen(true)}>
+      <View
+        style={[
+          styles.buttonLayer,
+          { top: insets.top + 10 },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.burgerButton}
+          onPress={() => setOpen(true)}
+        >
           <Text style={styles.burgerIcon}>☰</Text>
         </TouchableOpacity>
       </View>
 
       {open && (
         <View style={styles.overlay}>
-          <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => setOpen(false)}
+          />
 
-          <View style={[styles.drawer, { top: insets.top + 10 }]}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setOpen(false)}>
+          <View
+            style={[
+              styles.drawer,
+              { top: insets.top + 10 },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setOpen(false)}
+            >
               <Text style={styles.closeText}>×</Text>
             </TouchableOpacity>
+
             <Text style={styles.brand}>Daya</Text>
 
-            <TouchableOpacity style={styles.item} onPress={() => handlePress(onOpenNotes)}>
-              <Text style={styles.itemText}>Mes notes</Text>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() =>
+                handlePress(onOpenNotes)
+              }
+            >
+              <Text style={styles.itemText}>
+                📝 Mes notes
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.item} onPress={() => handlePress(onOpenReminders)}>
-              <Text style={styles.itemText}>Mes rappels</Text>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() =>
+                handlePress(onOpenReminders)
+              }
+            >
+              <Text style={styles.itemText}>
+                🔔 Mes rappels
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.item} onPress={() => handlePress(onOpenArchives)}>
-              <Text style={styles.itemText}>Archives</Text>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() =>
+                handlePress(onOpenMemory)
+              }
+            >
+              <Text style={styles.itemText}>
+                🧠 Mémoire vivante
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => handlePress(onOpenSettings)}>
-              <Text style={styles.itemText}>Paramètres</Text>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() =>
+                handlePress(onOpenArchives)
+              }
+            >
+              <Text style={styles.itemText}>
+                🗂 Archives
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.item,
+                styles.lastItem,
+              ]}
+              onPress={() =>
+                handlePress(onOpenSettings)
+              }
+            >
+              <Text style={styles.itemText}>
+                ⚙️ Paramètres
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -65,35 +135,112 @@ export function HomeMenu({
 
 const styles = StyleSheet.create({
   buttonLayer: {
-  position: 'absolute',
-  left: 22,
-  zIndex: 900,
-},
+    position: 'absolute',
+    left: 22,
+    zIndex: 900,
+  },
+
   burgerButton: {
-    width: 50, height: 50, borderRadius: 18, backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: '#E6ECF5', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 }, elevation: 6,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E6ECF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    elevation: 6,
   },
-  burgerIcon: { fontSize: 25, fontWeight: '900', color: '#0F172A' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.08)' },
+
+  burgerIcon: {
+    fontSize: 25,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+  },
+
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor:
+      'rgba(15, 23, 42, 0.08)',
+  },
+
   drawer: {
-    position: 'absolute', left: 22, width: 240, backgroundColor: '#FFFFFF',
-    borderRadius: 28, padding: 10, borderWidth: 1, borderColor: '#E6ECF5',
-    shadowColor: '#0F172A', shadowOpacity: 0.14, shadowRadius: 26,
-    shadowOffset: { width: 0, height: 16 }, elevation: 12,
+    position: 'absolute',
+    left: 22,
+    width: 260,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E6ECF5',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.14,
+    shadowRadius: 26,
+    shadowOffset: {
+      width: 0,
+      height: 16,
+    },
+    elevation: 12,
   },
-  closeButton: { width: 48, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8, backgroundColor: '#F8FBFF' },
-  closeText: { fontSize: 26, fontWeight: '900', color: '#0F172A' },
-  item: { paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#EEF2F7' },
-  lastItem: { borderBottomWidth: 0 },
-  itemText: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
+
+  closeButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: '#F8FBFF',
+  },
+
+  closeText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
+  item: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2F7',
+  },
+
+  lastItem: {
+    borderBottomWidth: 0,
+  },
+
+  itemText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
   brand: {
-  paddingHorizontal: 16,
-  paddingBottom: 12,
-  fontSize: 22,
-  fontWeight: '900',
-  color: '#2563EB',
-},
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#2563EB',
+  },
 });

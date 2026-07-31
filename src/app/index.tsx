@@ -118,11 +118,12 @@ export default function HomeScreen() {
       edges={['top', 'left', 'right']}
     >
       <HomeMenu
-        onOpenNotes={() => router.push('/notes')}
-        onOpenReminders={() => router.push('/reminders')}
-        onOpenArchives={() => router.push('/archives')}
-        onOpenSettings={() => router.push('/settings')}
-      />
+  onOpenNotes={() => router.push('/notes')}
+  onOpenReminders={() => router.push('/reminders')}
+  onOpenMemory={() => router.push('/memory')}
+  onOpenArchives={() => router.push('/archives')}
+  onOpenSettings={() => router.push('/settings')}
+/>
 
       <ScrollView
         style={styles.scrollView}

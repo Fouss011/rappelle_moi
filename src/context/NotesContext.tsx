@@ -797,60 +797,85 @@ export function NotesProvider({
         );
       }
 
-      const smartReminder = !aiAnalysis
-        ? detectSmartReminder(cleanText)
-        : null;
+      const aiHasTime =
+  typeof aiAnalysis?.time === 'string' &&
+  aiAnalysis.time.trim().length > 0;
 
-      let detected: DetectedReminder | null = null;
+const smartReminder = !aiHasTime
+  ? detectSmartReminder(cleanText)
+  : null;
 
-      if (
-        aiAnalysis?.type === 'reminder' &&
-        aiAnalysis.date &&
-        aiAnalysis.time
-      ) {
-        const reminderDate = new Date(
-          `${aiAnalysis.date}T${aiAnalysis.time}:00`
-        );
+let detected: DetectedReminder | null = null;
 
-        if (isValidFutureDate(reminderDate)) {
-          detected = {
-            reminderDate,
-            notifyDate:
-              resolveNotifyDate(reminderDate),
-          };
-        }
-      } else if (
-        smartReminder &&
-        isValidFutureDate(smartReminder)
-      ) {
-        detected = {
-          reminderDate: smartReminder,
-          notifyDate:
-            resolveNotifyDate(smartReminder),
-        };
-      } else {
-        detected =
-          detectReminderTime(cleanText);
-      }
+if (aiHasTime) {
+  const resolvedDate =
+    aiAnalysis?.date ||
+    new Date().toISOString().split('T')[0];
 
-      let scheduledNotification: {
-        notificationId: string;
-        notifyDate: Date;
-      } | null = null;
+  const resolvedTime = String(aiAnalysis?.time);
 
-      if (detected) {
-        scheduledNotification =
-          await scheduleReminderNotification(
-            cleanText,
-            detected.reminderDate
-          );
-      }
+  const reminderDate = new Date(
+    `${resolvedDate}T${resolvedTime}:00`
+  );
 
-      const finalNotifyDate =
-        scheduledNotification?.notifyDate ??
-        detected?.notifyDate;
+  if (
+    !aiAnalysis?.date &&
+    reminderDate.getTime() <= Date.now()
+  ) {
+    reminderDate.setDate(
+      reminderDate.getDate() + 1
+    );
+  }
 
-      const now = new Date();
+  if (isValidFutureDate(reminderDate)) {
+    detected = {
+      reminderDate,
+      notifyDate: resolveNotifyDate(reminderDate),
+    };
+  }
+} else if (
+  smartReminder &&
+  isValidFutureDate(smartReminder)
+) {
+  /**
+   * La détection locale est acceptée uniquement
+   * lorsqu’une véritable heure apparaît dans le texte.
+   */
+  const localTimeDetected =
+    /(\d{1,2})\s?h(?:\s?(\d{1,2}))?/i.test(
+      cleanText
+    ) ||
+    /\b\d{1,2}:\d{2}\b/.test(cleanText);
+
+  if (localTimeDetected) {
+    detected = {
+      reminderDate: smartReminder,
+      notifyDate:
+        resolveNotifyDate(smartReminder),
+    };
+  }
+} else {
+  detected = detectReminderTime(cleanText);
+}
+
+let scheduledNotification: {
+  notificationId: string;
+  notifyDate: Date;
+} | null = null;
+
+if (detected) {
+  scheduledNotification =
+    await scheduleReminderNotification(
+      cleanText,
+      detected.reminderDate
+    );
+}
+
+const finalNotifyDate =
+  scheduledNotification?.notifyDate ??
+  detected?.notifyDate;
+
+const now = new Date();
 
       const newNote: Note = {
         id: generateNoteId(),
@@ -872,11 +897,7 @@ export function NotesProvider({
 
         createdAtIso: now.toISOString(),
 
-        type:
-          aiAnalysis?.type === 'reminder' ||
-          detected
-            ? 'reminder'
-            : 'note',
+        type: detected ? 'reminder' : 'note',
 
         category:
           aiAnalysis?.category ??
