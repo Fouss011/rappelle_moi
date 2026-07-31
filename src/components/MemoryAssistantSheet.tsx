@@ -35,16 +35,12 @@ export function MemoryAssistantSheet({
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const { profile, user, session } = useAuth();
+  const { session } = useAuth();
 
   const scrollViewRef = useRef<ScrollView | null>(null);
   const insets = useSafeAreaInsets();
 
-  const firstName =
-    profile?.first_name ||
-    user?.email?.split('@')[0] ||
-    'toi';
-
+  
   useEffect(() => {
     if (!visible) {
       Keyboard.dismiss();
@@ -193,8 +189,8 @@ export function MemoryAssistantSheet({
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
             <Text style={styles.title}>
-              Mémoire de {firstName}
-            </Text>
+  Ma mémoire
+</Text>
 
             <Text style={styles.subtitle}>
               Retrouve une idée, un rappel ou un souvenir enregistré.

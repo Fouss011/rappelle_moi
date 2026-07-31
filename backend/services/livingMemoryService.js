@@ -507,6 +507,34 @@ Exemple :
 "Réserver le domaine Daya"
 peut servir de preuve pour le projet "Daya".
 
+IMPORTANT
+
+Si une tâche mentionne clairement le nom d'un projet, d'une application,
+d'une entreprise, d'un logiciel ou d'un produit, tu dois créer le projet
+correspondant même si une seule note en parle.
+
+Exemples :
+
+"Réserver le domaine Daya"
+→ Projet : Daya
+
+"Finir la documentation SNPT"
+→ Projet : SNPT
+
+"Corriger le backend Fretlôme"
+→ Projet : Fretlôme
+
+"Préparer la présentation Moulédi"
+→ Projet : Moulédi
+
+Le projet représente le contexte global.
+
+La tâche représente une action.
+
+Les deux peuvent exister simultanément.
+
+Un projet peut donc être créé même si la note parle uniquement d'une tâche liée à ce projet.
+
 2. goals
 
 Un objectif représente un résultat que l'utilisateur souhaite atteindre.
@@ -519,6 +547,34 @@ Exemples :
 - améliorer son organisation.
 
 Un objectif peut appartenir à un projet.
+
+Un objectif peut être créé dès qu'une note exprime clairement un résultat à atteindre.
+
+Exemples :
+
+- Finir la documentation
+- Réserver le domaine
+- Corriger les notifications
+- Publier l'application
+- Déployer le backend
+- Terminer la formation
+
+Même avec une seule preuve claire, un objectif peut être conservé avec une confiance comprise entre 0.55 et 0.70.
+
+Un objectif est différent d'une tâche.
+
+Exemple :
+
+"Réserver le domaine Daya"
+
+Projet :
+Daya
+
+Objectif :
+Mettre en ligne Daya
+
+Tâche en attente :
+Réserver le domaine
 
 3. importantPeople
 
@@ -579,7 +635,7 @@ RÈGLES SUR LE RÉSUMÉ PERSONNEL
 personalSummary doit :
 - contenir 2 à 4 phrases courtes ;
 - expliquer ce qui occupe l'utilisateur actuellement ;
-- mentionner les projets ou sujets les plus solides ;
+- mentionner en priorité les projets actifs, les objectifs principaux et les personnes les plus importantes lorsqu'ils existent ;
 - rester prudent ;
 - ne jamais écrire "aucune information personnelle disponible" lorsque des notes existent ;
 - ne jamais inventer une identité ou une relation.
