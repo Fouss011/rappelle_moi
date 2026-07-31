@@ -7,6 +7,13 @@ import {
   View,
 } from 'react-native';
 
+function shouldDisplayBody(item: any) {
+  const title = item.title?.trim().toLowerCase();
+  const text = item.text?.trim().toLowerCase();
+
+  return Boolean(text && title !== text);
+}
+
 function NoteCard({
   item,
   editingNoteId,
@@ -19,19 +26,44 @@ function NoteCard({
   deleteNote,
   toggleDone,
 }: any) {
-  const isEditing = editingNoteId === item.id;
+  const isEditing =
+    editingNoteId === item.id;
 
   return (
-    <View style={[styles.noteCard, item.isDone && styles.noteCardDone]}>
+    <View
+      style={[
+        styles.noteCard,
+        item.isDone && styles.noteCardDone,
+      ]}
+    >
       <View style={styles.noteTopRow}>
         <View style={styles.timePill}>
-          <Text style={styles.timeText}>{item.createdAt}</Text>
+          <Text style={styles.timeText}>
+            {item.createdAt}
+          </Text>
         </View>
 
-        <TouchableOpacity onPress={() => toggleDone(item.id)} style={styles.donePill}>
-          <Text style={styles.doneText}>{item.isDone ? '☑ Fait' : '☐ À faire'}</Text>
+        <TouchableOpacity
+          onPress={() => toggleDone(item.id)}
+          style={styles.donePill}
+        >
+          <Text style={styles.doneText}>
+            {item.isDone
+              ? '☑ Fait'
+              : '☐ À faire'}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      <Text
+        style={[
+          styles.noteTitle,
+          item.isDone &&
+            styles.noteTitleDone,
+        ]}
+      >
+        {item.title || '📝 Nouvelle note'}
+      </Text>
 
       {isEditing ? (
         <View>
@@ -43,64 +75,136 @@ function NoteCard({
           />
 
           <View style={styles.editActions}>
-            <TouchableOpacity style={styles.saveEditButton} onPress={saveEditedNote}>
-              <Text style={styles.saveEditText}>Enregistrer</Text>
+            <TouchableOpacity
+              style={styles.saveEditButton}
+              onPress={saveEditedNote}
+            >
+              <Text
+                style={styles.saveEditText}
+              >
+                Enregistrer
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelEditButton} onPress={cancelEditingNote}>
-              <Text style={styles.cancelEditText}>Annuler</Text>
+            <TouchableOpacity
+              style={styles.cancelEditButton}
+              onPress={cancelEditingNote}
+            >
+              <Text
+                style={styles.cancelEditText}
+              >
+                Annuler
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <Text style={[styles.noteText, item.isDone && styles.noteTextDone]}>
-          {item.text}
-        </Text>
+        shouldDisplayBody(item) && (
+          <Text
+            style={[
+              styles.noteText,
+              item.isDone &&
+                styles.noteTextDone,
+            ]}
+          >
+            {item.text}
+          </Text>
+        )
       )}
 
       <View style={styles.metaRow}>
-        <Text style={styles.categoryText}>📂 {item.category}</Text>
+        <Text style={styles.categoryText}>
+          📂 {item.category}
+        </Text>
 
         {item.type === 'reminder' && (
-          <Text style={styles.reminderText}>🔔 {item.reminderAt}</Text>
+          <Text style={styles.reminderText}>
+            🔔 {item.reminderAt}
+          </Text>
         )}
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity onPress={() => toggleImportant(item.id)}>
-          <Text style={styles.importantText}>
-            {item.isImportant ? '⭐ Important' : '☆ Important'}
+        <TouchableOpacity
+          onPress={() =>
+            toggleImportant(item.id)
+          }
+        >
+          <Text
+            style={styles.importantText}
+          >
+            {item.isImportant
+              ? '⭐ Important'
+              : '☆ Important'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => startEditingNote(item)}>
-          <Text style={styles.editText}>Modifier</Text>
+        <TouchableOpacity
+          onPress={() =>
+            startEditingNote(item)
+          }
+        >
+          <Text style={styles.editText}>
+            Modifier
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => deleteNote(item.id)}>
-          <Text style={styles.deleteText}>Supprimer</Text>
+        <TouchableOpacity
+          onPress={() => deleteNote(item.id)}
+        >
+          <Text style={styles.deleteText}>
+            Supprimer
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function SimpleNoteCard({ item }: any) {
+function SimpleNoteCard({
+  item,
+}: any) {
   return (
     <View style={styles.simpleCard}>
       <View style={styles.noteTopRow}>
         <View style={styles.timePill}>
-          <Text style={styles.timeText}>{item.createdAt}</Text>
+          <Text style={styles.timeText}>
+            {item.createdAt}
+          </Text>
         </View>
       </View>
 
-      <Text style={styles.noteText}>{item.text}</Text>
+      <Text
+        style={[
+          styles.noteTitle,
+          item.isDone &&
+            styles.noteTitleDone,
+        ]}
+      >
+        {item.title || '📝 Nouvelle note'}
+      </Text>
+
+      {shouldDisplayBody(item) && (
+        <Text
+          style={[
+            styles.noteText,
+            item.isDone &&
+              styles.noteTextDone,
+          ]}
+        >
+          {item.text}
+        </Text>
+      )}
 
       <View style={styles.metaRow}>
-        <Text style={styles.categoryText}>📂 {item.category}</Text>
+        <Text style={styles.categoryText}>
+          📂 {item.category}
+        </Text>
 
         {item.type === 'reminder' && (
-          <Text style={styles.reminderText}>🔔 {item.reminderAt}</Text>
+          <Text style={styles.reminderText}>
+            🔔 {item.reminderAt}
+          </Text>
         )}
       </View>
     </View>
@@ -128,10 +232,18 @@ export function NotesList({
       scrollEnabled={false}
       ListEmptyComponent={
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>🧠</Text>
-          <Text style={styles.emptyTitle}>Aucune idée aujourd’hui</Text>
+          <Text style={styles.emptyIcon}>
+            🧠
+          </Text>
+
+          <Text style={styles.emptyTitle}>
+            Aucune idée aujourd’hui
+          </Text>
+
           <Text style={styles.emptyText}>
-            Écris une première pensée ou utilise le micro quand il sera branché.
+            Écris une première pensée ou
+            utilise le micro quand il sera
+            branché.
           </Text>
         </View>
       }
@@ -142,9 +254,15 @@ export function NotesList({
           editingText={editingText}
           setEditingText={setEditingText}
           saveEditedNote={saveEditedNote}
-          cancelEditingNote={cancelEditingNote}
-          toggleImportant={toggleImportant}
-          startEditingNote={startEditingNote}
+          cancelEditingNote={
+            cancelEditingNote
+          }
+          toggleImportant={
+            toggleImportant
+          }
+          startEditingNote={
+            startEditingNote
+          }
           deleteNote={deleteNote}
           toggleDone={toggleDone}
         />
@@ -152,28 +270,62 @@ export function NotesList({
       ListFooterComponent={
         <>
           {yesterdayNotes.length > 0 && (
-            <View style={styles.historySection}>
-              <Text style={styles.sectionTitle}>Hier</Text>
-              <Text style={styles.sectionSubtitle}>
-                {yesterdayNotes.length} élément(s) sauvegardé(s)
+            <View
+              style={styles.historySection}
+            >
+              <Text
+                style={styles.sectionTitle}
+              >
+                Hier
               </Text>
 
-              {yesterdayNotes.map((item: any) => (
-                <SimpleNoteCard key={item.id} item={item} />
-              ))}
+              <Text
+                style={
+                  styles.sectionSubtitle
+                }
+              >
+                {yesterdayNotes.length}{' '}
+                élément(s) sauvegardé(s)
+              </Text>
+
+              {yesterdayNotes.map(
+                (item: any) => (
+                  <SimpleNoteCard
+                    key={item.id}
+                    item={item}
+                  />
+                )
+              )}
             </View>
           )}
 
           {olderNotes.length > 0 && (
-            <View style={styles.historySection}>
-              <Text style={styles.sectionTitle}>Anciennes notes</Text>
-              <Text style={styles.sectionSubtitle}>
-                {olderNotes.length} élément(s) retrouvé(s)
+            <View
+              style={styles.historySection}
+            >
+              <Text
+                style={styles.sectionTitle}
+              >
+                Anciennes notes
               </Text>
 
-              {olderNotes.map((item: any) => (
-                <SimpleNoteCard key={item.id} item={item} />
-              ))}
+              <Text
+                style={
+                  styles.sectionSubtitle
+                }
+              >
+                {olderNotes.length}{' '}
+                élément(s) retrouvé(s)
+              </Text>
+
+              {olderNotes.map(
+                (item: any) => (
+                  <SimpleNoteCard
+                    key={item.id}
+                    item={item}
+                  />
+                )
+              )}
             </View>
           )}
         </>
@@ -182,224 +334,245 @@ export function NotesList({
   );
 }
 
-const styles = StyleSheet.create({
-  emptyBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 26,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-    marginBottom: 16,
-  },
+const styles =
+  StyleSheet.create({
+    emptyBox: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 26,
+      padding: 24,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E6ECF5',
+      marginBottom: 16,
+    },
 
-  emptyIcon: {
-    fontSize: 34,
-    marginBottom: 10,
-  },
+    emptyIcon: {
+      fontSize: 34,
+      marginBottom: 10,
+    },
 
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: '#0F172A',
+    },
 
-  emptyText: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: '#64748B',
-    textAlign: 'center',
-  },
+    emptyText: {
+      marginTop: 6,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '600',
+      color: '#64748B',
+      textAlign: 'center',
+    },
 
-  noteCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 26,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-  },
+    noteCard: {
+      backgroundColor: '#FFFFFF',
+      padding: 16,
+      borderRadius: 26,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: '#E6ECF5',
+      shadowColor: '#0F172A',
+      shadowOpacity: 0.05,
+      shadowRadius: 16,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      elevation: 3,
+    },
 
-  noteCardDone: {
-    opacity: 0.7,
-  },
+    noteCardDone: {
+      opacity: 0.7,
+    },
 
-  simpleCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 24,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-  },
+    simpleCard: {
+      backgroundColor: '#FFFFFF',
+      padding: 16,
+      borderRadius: 24,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: '#E6ECF5',
+    },
 
-  noteTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
+    noteTopRow: {
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
 
-  timePill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
+    timePill: {
+      backgroundColor: '#F1F5F9',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
 
-  timeText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '900',
-  },
+    timeText: {
+      fontSize: 12,
+      color: '#64748B',
+      fontWeight: '900',
+    },
 
-  donePill: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
+    donePill: {
+      backgroundColor: '#ECFDF5',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
 
-  doneText: {
-    color: '#16A34A',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+    doneText: {
+      color: '#16A34A',
+      fontSize: 12,
+      fontWeight: '900',
+    },
 
-  noteText: {
-    fontSize: 16,
-    color: '#0F172A',
-    lineHeight: 23,
-    fontWeight: '700',
-  },
+    noteTitle: {
+      fontSize: 18,
+      lineHeight: 24,
+      color: '#0F172A',
+      fontWeight: '900',
+      marginBottom: 7,
+    },
 
-  noteTextDone: {
-    textDecorationLine: 'line-through',
-    color: '#64748B',
-  },
+    noteTitleDone: {
+      textDecorationLine:
+        'line-through',
+      color: '#64748B',
+    },
 
-  editInput: {
-    backgroundColor: '#F8FBFF',
-    borderWidth: 1,
-    borderColor: '#DCE6F3',
-    borderRadius: 18,
-    padding: 12,
-    fontSize: 15,
-    color: '#0F172A',
-    minHeight: 78,
-    textAlignVertical: 'top',
-    fontWeight: '600',
-  },
+    noteText: {
+      fontSize: 15,
+      color: '#475569',
+      lineHeight: 22,
+      fontWeight: '600',
+    },
 
-  editActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
+    noteTextDone: {
+      textDecorationLine:
+        'line-through',
+      color: '#94A3B8',
+    },
 
-  saveEditButton: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
+    editInput: {
+      backgroundColor: '#F8FBFF',
+      borderWidth: 1,
+      borderColor: '#DCE6F3',
+      borderRadius: 18,
+      padding: 12,
+      fontSize: 15,
+      color: '#0F172A',
+      minHeight: 78,
+      textAlignVertical: 'top',
+      fontWeight: '600',
+    },
 
-  cancelEditButton: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
+    editActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 10,
+    },
 
-  saveEditText: {
-    color: '#16A34A',
-    fontWeight: '900',
-    fontSize: 13,
-  },
+    saveEditButton: {
+      backgroundColor: '#DCFCE7',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+    },
 
-  cancelEditText: {
-    color: '#64748B',
-    fontWeight: '900',
-    fontSize: 13,
-  },
+    cancelEditButton: {
+      backgroundColor: '#F1F5F9',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+    },
 
-  metaRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+    saveEditText: {
+      color: '#16A34A',
+      fontWeight: '900',
+      fontSize: 13,
+    },
 
-  categoryText: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '900',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
+    cancelEditText: {
+      color: '#64748B',
+      fontWeight: '900',
+      fontSize: 13,
+    },
 
-  reminderText: {
-    fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '900',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
+    metaRow: {
+      marginTop: 12,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
 
-  actionsRow: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#EEF2F7',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+    categoryText: {
+      fontSize: 12,
+      color: '#475569',
+      fontWeight: '900',
+      backgroundColor: '#F1F5F9',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
 
-  importantText: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+    reminderText: {
+      fontSize: 12,
+      color: '#2563EB',
+      fontWeight: '900',
+      backgroundColor: '#EFF6FF',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
 
-  editText: {
-    color: '#2563EB',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+    actionsRow: {
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: '#EEF2F7',
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+    },
 
-  deleteText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+    importantText: {
+      color: '#F59E0B',
+      fontSize: 12,
+      fontWeight: '900',
+    },
 
-  historySection: {
-    marginTop: 20,
-  },
+    editText: {
+      color: '#2563EB',
+      fontSize: 12,
+      fontWeight: '900',
+    },
 
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 3,
-  },
+    deleteText: {
+      color: '#EF4444',
+      fontSize: 12,
+      fontWeight: '900',
+    },
 
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-});
+    historySection: {
+      marginTop: 20,
+    },
+
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '900',
+      color: '#0F172A',
+      marginBottom: 3,
+    },
+
+    sectionSubtitle: {
+      fontSize: 13,
+      color: '#64748B',
+      fontWeight: '700',
+      marginBottom: 12,
+    },
+  });

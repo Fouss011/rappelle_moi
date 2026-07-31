@@ -36,18 +36,40 @@ export default function RootLayout() {
          * au canal nommé "default".
          */
         if (Platform.OS === 'android') {
-          await Notifications.setNotificationChannelAsync('default', {
-            name: 'Rappels',
-            description: 'Notifications et rappels de Daya',
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-            enableVibrate: true,
-            enableLights: true,
-            sound: 'default',
-            lockscreenVisibility:
-              Notifications.AndroidNotificationVisibility.PUBLIC,
-          });
-        }
+  await Notifications.setNotificationChannelAsync(
+    'daya-reminders-v1',
+    {
+      name: 'Rappels Daya',
+      description:
+        'Rappels personnels avec son et vibration',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 400, 200, 400],
+      enableLights: true,
+      lightColor: '#2563EB',
+      lockscreenVisibility:
+        Notifications.AndroidNotificationVisibility.PUBLIC,
+    }
+  );
+
+  await Notifications.setNotificationChannelAsync(
+    'daya-briefings-v1',
+    {
+      name: 'Briefings Daya',
+      description:
+        'Bilans et résumés du matin et du soir',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 150, 250],
+      enableLights: true,
+      lightColor: '#2563EB',
+      lockscreenVisibility:
+        Notifications.AndroidNotificationVisibility.PUBLIC,
+    }
+  );
+}
 
         /**
          * Vérifie d'abord si l'utilisateur a déjà donné son autorisation.

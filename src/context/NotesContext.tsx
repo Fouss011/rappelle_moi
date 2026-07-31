@@ -52,12 +52,99 @@ type DetectedReminder = {
 
 const NotesContext = createContext<NotesContextValue | null>(null);
 
-/**
- * Détecte une heure simple dans une phrase :
- *
- * "appeler Rachel à 18h"
- * "rendez-vous à 14h30"
- */
+const TITLE_MAX_WORDS = 6;
+
+const TITLE_EMOJI_RULES: Array<{
+  emoji: string;
+  words: string[];
+}> = [
+  {
+    emoji: '📞',
+    words: ['appeler', 'appel', 'téléphoner', 'contacter'],
+  },
+  {
+    emoji: '📄',
+    words: [
+      'document',
+      'documentation',
+      'dossier',
+      'rapport',
+      'pdf',
+      'contrat',
+      'courrier',
+    ],
+  },
+  {
+    emoji: '🌐',
+    words: [
+      'domaine',
+      'site',
+      'internet',
+      'netlify',
+      'fly',
+      'supabase',
+      'déployer',
+      'déploiement',
+    ],
+  },
+  {
+    emoji: '🛒',
+    words: [
+      'acheter',
+      'courses',
+      'lait',
+      'pain',
+      'magasin',
+      'commande',
+    ],
+  },
+  {
+    emoji: '💡',
+    words: ['idée', 'imaginer', 'concept', 'améliorer'],
+  },
+  {
+    emoji: '💼',
+    words: ['travail', 'lidl', 'snpt', 'réunion', 'client'],
+  },
+  {
+    emoji: '💻',
+    words: [
+      'code',
+      'coder',
+      'application',
+      'backend',
+      'frontend',
+      'bug',
+      'corriger',
+    ],
+  },
+  {
+    emoji: '📅',
+    words: [
+      'rendez-vous',
+      'réunion',
+      'planning',
+      'prévoir',
+      'réserver',
+    ],
+  },
+  {
+    emoji: '💳',
+    words: [
+      'payer',
+      'paiement',
+      'facture',
+      'banque',
+      'argent',
+      'budget',
+    ],
+  },
+  {
+    emoji: '🏠',
+    words: ['maison', 'famille', 'rachel', 'enfant', 'papa', 'maman'],
+  },
+];
+
 function detectReminderTime(text: string): DetectedReminder | null {
   const match = text.match(/(\d{1,2})\s?h(?:\s?(\d{1,2}))?/i);
 
@@ -82,10 +169,6 @@ function detectReminderTime(text: string): DetectedReminder | null {
   const reminderDate = new Date();
   reminderDate.setHours(hour, minute, 0, 0);
 
-  /**
-   * Si l’heure est déjà passée aujourd’hui,
-   * le rappel est programmé pour demain.
-   */
   if (reminderDate.getTime() <= Date.now()) {
     reminderDate.setDate(reminderDate.getDate() + 1);
   }
@@ -96,15 +179,10 @@ function detectReminderTime(text: string): DetectedReminder | null {
   };
 }
 
-/**
- * On essaie de prévenir dix minutes avant.
- *
- * Si les dix minutes avant sont déjà passées,
- * la notification arrivera à l’heure exacte du rappel.
- */
 function resolveNotifyDate(reminderDate: Date) {
   const now = Date.now();
-  const tenMinutesBefore = reminderDate.getTime() - 10 * 60 * 1000;
+  const tenMinutesBefore =
+    reminderDate.getTime() - 10 * 60 * 1000;
 
   if (tenMinutesBefore > now) {
     return new Date(tenMinutesBefore);
@@ -125,14 +203,15 @@ async function notificationsAreAllowed() {
     return false;
   }
 
-  const permissions = await Notifications.getPermissionsAsync();
+  const permissions =
+    await Notifications.getPermissionsAsync();
 
-  return permissions.granted || permissions.status === 'granted';
+  return (
+    permissions.granted ||
+    permissions.status === 'granted'
+  );
 }
 
-/**
- * Programme une notification locale sur le téléphone.
- */
 async function scheduleReminderNotification(
   text: string,
   reminderDate: Date
@@ -180,7 +259,7 @@ async function scheduleReminderNotification(
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: notifyDate,
-          channelId: 'default',
+          channelId: 'daya-reminders-v1',
         },
       });
 
@@ -214,9 +293,14 @@ function buildMorningText(notes: Note[]) {
         return false;
       }
 
-      const reminderTime = new Date(item.reminderAtIso).getTime();
+      const reminderTime = new Date(
+        item.reminderAtIso
+      ).getTime();
 
-      return !Number.isNaN(reminderTime) && reminderTime > now;
+      return (
+        !Number.isNaN(reminderTime) &&
+        reminderTime > now
+      );
     })
     .sort((a, b) => {
       return (
@@ -226,7 +310,7 @@ function buildMorningText(notes: Note[]) {
     });
 
   if (upcomingReminders.length === 0) {
-    return "Bonjour 👋 Aucun rappel à venir pour le moment.";
+    return 'Bonjour 👋 Aucun rappel à venir pour le moment.';
   }
 
   const firstReminders = upcomingReminders.slice(0, 3);
@@ -245,7 +329,7 @@ function buildMorningText(notes: Note[]) {
         minute: '2-digit',
       });
 
-      return `${item.text} — ${day} à ${time}`;
+      return `${item.title || item.text} — ${day} à ${time}`;
     })
     .join(' • ');
 
@@ -256,7 +340,6 @@ function buildMorningText(notes: Note[]) {
     ? `Bonjour 👋 Tes prochains rappels : ${details} • Et ${remainingCount} autre(s).`
     : `Bonjour 👋 Tes prochains rappels : ${details}`;
 }
-
 
 function buildEveningText(notes: Note[]) {
   const now = Date.now();
@@ -272,7 +355,9 @@ function buildEveningText(notes: Note[]) {
       return false;
     }
 
-    const creationTime = new Date(item.createdAtIso).getTime();
+    const creationTime = new Date(
+      item.createdAtIso
+    ).getTime();
 
     return (
       !Number.isNaN(creationTime) &&
@@ -287,9 +372,14 @@ function buildEveningText(notes: Note[]) {
         return false;
       }
 
-      const reminderTime = new Date(item.reminderAtIso).getTime();
+      const reminderTime = new Date(
+        item.reminderAtIso
+      ).getTime();
 
-      return !Number.isNaN(reminderTime) && reminderTime > now;
+      return (
+        !Number.isNaN(reminderTime) &&
+        reminderTime > now
+      );
     })
     .sort((a, b) => {
       return (
@@ -303,7 +393,9 @@ function buildEveningText(notes: Note[]) {
   }
 
   const nextReminder = upcomingReminders[0];
-  const nextDate = new Date(nextReminder.reminderAtIso!);
+  const nextDate = new Date(
+    nextReminder.reminderAtIso!
+  );
 
   const day = nextDate.toLocaleDateString('fr-FR', {
     weekday: 'short',
@@ -316,7 +408,7 @@ function buildEveningText(notes: Note[]) {
     minute: '2-digit',
   });
 
-   return `Bonsoir 👋 ${doneToday} élément(s) créés aujourd’hui sont terminés. ${upcomingReminders.length} rappel(s) à venir. Prochain : ${nextReminder.text} — ${day} à ${time}.`;
+  return `Bonsoir 👋 ${doneToday} élément(s) créés aujourd’hui sont terminés. ${upcomingReminders.length} rappel(s) à venir. Prochain : ${nextReminder.title || nextReminder.text} — ${day} à ${time}.`;
 }
 
 async function cancelDailyNotifications() {
@@ -340,12 +432,16 @@ async function cancelDailyNotifications() {
 
   await Promise.all(
     dailyNotificationIds.map((identifier) =>
-      Notifications.cancelScheduledNotificationAsync(identifier)
+      Notifications.cancelScheduledNotificationAsync(
+        identifier
+      )
     )
   );
 }
 
-async function scheduleDailyNotifications(notes: Note[]) {
+async function scheduleDailyNotifications(
+  notes: Note[]
+) {
   if (Platform.OS === 'web') {
     return;
   }
@@ -371,7 +467,7 @@ async function scheduleDailyNotifications(notes: Note[]) {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: 8,
       minute: 0,
-      channelId: 'default',
+      channelId: 'daya-briefings-v1',
     },
   });
 
@@ -388,7 +484,7 @@ async function scheduleDailyNotifications(notes: Note[]) {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: 21,
       minute: 0,
-      channelId: 'default',
+      channelId: 'daya-briefings-v1',
     },
   });
 
@@ -397,14 +493,125 @@ async function scheduleDailyNotifications(notes: Note[]) {
   );
 }
 
-function generateFallbackTitle(text: string) {
-  const cleanText = text.trim();
+function detectTitleEmoji(text: string) {
+  const lowerText = text.toLowerCase();
 
-  if (cleanText.length <= 45) {
-    return cleanText;
+  const matchedRule = TITLE_EMOJI_RULES.find(
+    ({ words }) =>
+      words.some((word) => lowerText.includes(word))
+  );
+
+  return matchedRule?.emoji ?? '📝';
+}
+
+function removeReminderDetails(text: string) {
+  return text
+    .replace(
+      /\b(aujourd['’]?hui|demain|après-demain|ce soir|ce matin|cet après-midi)\b/gi,
+      ' '
+    )
+    .replace(
+      /\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)(\s+prochain)?\b/gi,
+      ' '
+    )
+    .replace(/\bdans\s+\d+\s+(minute|heure|jour|semaine|mois)s?\b/gi, ' ')
+    .replace(/\bavant\s+\w+\b/gi, ' ')
+    .replace(/\b(le|pour)\s+\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b/gi, ' ')
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, ' ')
+    .replace(/\b(à|vers)\s+\d{1,2}\s?h(?:\s?\d{1,2})?\b/gi, ' ')
+    .replace(/\b\d{1,2}:\d{2}\b/g, ' ');
+}
+
+function removeTitleIntroductions(text: string) {
+  return text
+    .replace(
+      /^(je dois|il faut|penser à|pense à|ne pas oublier de|n['’]oublie pas de|rappelle-moi de|rappelle moi de|j['’]ai besoin de|je veux|je voudrais)\s+/i,
+      ''
+    )
+    .replace(/^(prévoir de|prévoir|faire|finir de)\s+/i, (match) =>
+      match.toLowerCase().startsWith('finir')
+        ? 'Finir '
+        : ''
+    );
+}
+
+function capitalizeTitle(text: string) {
+  if (!text) {
+    return '';
   }
 
-  return `${cleanText.slice(0, 45).trim()}…`;
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+function generateFallbackTitle(text: string) {
+  const emoji = detectTitleEmoji(text);
+
+  const cleanedText = removeTitleIntroductions(
+    removeReminderDetails(text)
+  )
+    .replace(/[.,;:!?]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleanedText) {
+    return `${emoji} Nouvelle note`;
+  }
+
+  const words = cleanedText.split(/\s+/);
+  const shortened = words
+    .slice(0, TITLE_MAX_WORDS)
+    .join(' ');
+
+  return `${emoji} ${capitalizeTitle(shortened)}`;
+}
+
+function normalizeGeneratedTitle(
+  title: unknown,
+  originalText: string
+) {
+  if (typeof title !== 'string') {
+    return generateFallbackTitle(originalText);
+  }
+
+  const cleanedTitle = title
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/^["'«»]+|["'«»]+$/g, '')
+    .replace(/[.]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleanedTitle) {
+    return generateFallbackTitle(originalText);
+  }
+
+  const normalizedOriginal = originalText
+    .trim()
+    .toLowerCase();
+
+  const normalizedTitle = cleanedTitle.toLowerCase();
+
+  if (
+    normalizedTitle === normalizedOriginal ||
+    cleanedTitle.length > 70
+  ) {
+    return generateFallbackTitle(originalText);
+  }
+
+  const words = cleanedTitle.split(/\s+/);
+  const shortenedTitle = words
+    .slice(0, TITLE_MAX_WORDS + 1)
+    .join(' ');
+
+  const startsWithEmoji =
+    /^\p{Extended_Pictographic}/u.test(
+      shortenedTitle
+    );
+
+  if (startsWithEmoji) {
+    return shortenedTitle;
+  }
+
+  return `${detectTitleEmoji(originalText)} ${shortenedTitle}`;
 }
 
 function generateNoteId() {
@@ -431,30 +638,35 @@ export function NotesProvider({
         return;
       }
 
-      const { error } = await supabase.from('notes').upsert({
-        id: item.id,
-        user_id: user.id,
-        
-        title: item.title,
-        text: item.text,
+      const { error } = await supabase
+        .from('notes')
+        .upsert({
+          id: item.id,
+          user_id: user.id,
 
-        created_at: item.createdAt,
-        created_at_iso: item.createdAtIso,
+          title: item.title,
+          text: item.text,
 
-        type: item.type,
-        category: item.category,
+          created_at: item.createdAt,
+          created_at_iso: item.createdAtIso,
 
-        reminder_at: item.reminderAt ?? null,
-        notify_at: item.notifyAt ?? null,
+          type: item.type,
+          category: item.category,
 
-        reminder_at_iso: item.reminderAtIso ?? null,
-        notify_at_iso: item.notifyAtIso ?? null,
+          reminder_at: item.reminderAt ?? null,
+          notify_at: item.notifyAt ?? null,
 
-        notification_id: item.notificationId ?? null,
+          reminder_at_iso:
+            item.reminderAtIso ?? null,
+          notify_at_iso:
+            item.notifyAtIso ?? null,
 
-        is_important: item.isImportant,
-        is_done: item.isDone,
-      });
+          notification_id:
+            item.notificationId ?? null,
+
+          is_important: item.isImportant,
+          is_done: item.isDone,
+        });
 
       if (error) {
         console.error(
@@ -498,9 +710,10 @@ export function NotesProvider({
         data?.map((item) => ({
           id: item.id,
 
-          title:
-            item.title?.trim() ||
-            generateFallbackTitle(item.text),
+          title: normalizeGeneratedTitle(
+            item.title,
+            item.text
+          ),
 
           text: item.text,
           createdAt: item.created_at,
@@ -508,15 +721,22 @@ export function NotesProvider({
           type: item.type,
           category: item.category,
 
-          reminderAt: item.reminder_at ?? undefined,
-          notifyAt: item.notify_at ?? undefined,
+          reminderAt:
+            item.reminder_at ?? undefined,
+          notifyAt:
+            item.notify_at ?? undefined,
 
-          reminderAtIso: item.reminder_at_iso ?? undefined,
-          notifyAtIso: item.notify_at_iso ?? undefined,
+          reminderAtIso:
+            item.reminder_at_iso ?? undefined,
+          notifyAtIso:
+            item.notify_at_iso ?? undefined,
 
-          notificationId: item.notification_id ?? undefined,
+          notificationId:
+            item.notification_id ?? undefined,
 
-          isImportant: Boolean(item.is_important),
+          isImportant: Boolean(
+            item.is_important
+          ),
           isDone: Boolean(item.is_done),
         })) ?? [];
 
@@ -537,10 +757,6 @@ export function NotesProvider({
     void loadNotes();
   }, [loadNotes]);
 
-  /**
-   * Les notifications de 8 h et 21 h sont recréées
-   * seulement lorsque la liste de notes réellement chargée change.
-   */
   useEffect(() => {
     if (!user || !notesLoaded) {
       return;
@@ -565,21 +781,21 @@ export function NotesProvider({
     setSaving(true);
 
     try {
-  let aiAnalysis = null;
+      let aiAnalysis = null;
 
-  try {
-    if (session?.access_token) {
-      aiAnalysis = await analyseNoteWithAI(
-        cleanText,
-        session.access_token
-      );
-    }
-  } catch (error) {
-    console.warn(
-      "L'analyse IA a échoué. La détection locale sera utilisée.",
-      error
-    );
-  }
+      try {
+        if (session?.access_token) {
+          aiAnalysis = await analyseNoteWithAI(
+            cleanText,
+            session.access_token
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "L'analyse IA a échoué. La détection locale sera utilisée.",
+          error
+        );
+      }
 
       const smartReminder = !aiAnalysis
         ? detectSmartReminder(cleanText)
@@ -599,7 +815,8 @@ export function NotesProvider({
         if (isValidFutureDate(reminderDate)) {
           detected = {
             reminderDate,
-            notifyDate: resolveNotifyDate(reminderDate),
+            notifyDate:
+              resolveNotifyDate(reminderDate),
           };
         }
       } else if (
@@ -608,10 +825,12 @@ export function NotesProvider({
       ) {
         detected = {
           reminderDate: smartReminder,
-          notifyDate: resolveNotifyDate(smartReminder),
+          notifyDate:
+            resolveNotifyDate(smartReminder),
         };
       } else {
-        detected = detectReminderTime(cleanText);
+        detected =
+          detectReminderTime(cleanText);
       }
 
       let scheduledNotification: {
@@ -627,11 +846,8 @@ export function NotesProvider({
           );
       }
 
-      /**
-       * Même si Android refuse la notification,
-       * la note reste un rappel dans l’application.
-       */
-      const finalNotifyDate = scheduledNotification?.notifyDate ??
+      const finalNotifyDate =
+        scheduledNotification?.notifyDate ??
         detected?.notifyDate;
 
       const now = new Date();
@@ -639,21 +855,26 @@ export function NotesProvider({
       const newNote: Note = {
         id: generateNoteId(),
 
-        title:
-          aiAnalysis?.title?.trim() ||
-          generateFallbackTitle(cleanText),
+        title: normalizeGeneratedTitle(
+          aiAnalysis?.title,
+          cleanText
+        ),
 
         text: cleanText,
 
-        createdAt: now.toLocaleTimeString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        createdAt: now.toLocaleTimeString(
+          'fr-FR',
+          {
+            hour: '2-digit',
+            minute: '2-digit',
+          }
+        ),
 
         createdAtIso: now.toISOString(),
 
         type:
-          aiAnalysis?.type === 'reminder' || detected
+          aiAnalysis?.type === 'reminder' ||
+          detected
             ? 'reminder'
             : 'note',
 
@@ -662,17 +883,23 @@ export function NotesProvider({
           detectCategory(cleanText),
 
         reminderAt: detected
-          ? detected.reminderDate.toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
+          ? detected.reminderDate.toLocaleTimeString(
+              'fr-FR',
+              {
+                hour: '2-digit',
+                minute: '2-digit',
+              }
+            )
           : undefined,
 
         notifyAt: finalNotifyDate
-          ? finalNotifyDate.toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
+          ? finalNotifyDate.toLocaleTimeString(
+              'fr-FR',
+              {
+                hour: '2-digit',
+                minute: '2-digit',
+              }
+            )
           : undefined,
 
         reminderAtIso:
@@ -705,12 +932,12 @@ export function NotesProvider({
       setSaving(false);
     }
   }, [
-  note,
-  saveNoteToSupabase,
-  saving,
-  user,
-  session?.access_token,
-]);
+    note,
+    saveNoteToSupabase,
+    saving,
+    user,
+    session?.access_token,
+  ]);
 
   const deleteNote = useCallback(
     async (id: string) => {
@@ -719,13 +946,11 @@ export function NotesProvider({
       );
 
       setNotes((current) =>
-        current.filter((item) => item.id !== id)
+        current.filter(
+          (item) => item.id !== id
+        )
       );
 
-      /**
-       * Une note supprimée ne doit plus déclencher
-       * une notification plus tard.
-       */
       if (
         Platform.OS !== 'web' &&
         itemToDelete?.notificationId
@@ -785,10 +1010,6 @@ export function NotesProvider({
         )
       );
 
-      /**
-       * Quand un rappel est terminé,
-       * sa notification encore en attente est annulée.
-       */
       if (
         newValue &&
         Platform.OS !== 'web' &&
@@ -834,7 +1055,8 @@ export function NotesProvider({
         return;
       }
 
-      const newValue = !currentNote.isImportant;
+      const newValue =
+        !currentNote.isImportant;
 
       setNotes((currentNotes) =>
         currentNotes.map((item) =>
@@ -889,11 +1111,15 @@ export function NotesProvider({
       })
       .sort((a, b) => {
         const dateA = a.reminderAtIso
-          ? new Date(a.reminderAtIso).getTime()
+          ? new Date(
+              a.reminderAtIso
+            ).getTime()
           : 0;
 
         const dateB = b.reminderAtIso
-          ? new Date(b.reminderAtIso).getTime()
+          ? new Date(
+              b.reminderAtIso
+            ).getTime()
           : 0;
 
         return dateA - dateB;
@@ -901,14 +1127,18 @@ export function NotesProvider({
   }, [notes]);
 
   const pendingNotes = useMemo(() => {
-  return notes
-    .filter((item) => !item.isDone)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAtIso).getTime() -
-        new Date(a.createdAtIso).getTime()
-    );
-}, [notes]);
+    return notes
+      .filter((item) => !item.isDone)
+      .sort(
+        (a, b) =>
+          new Date(
+            b.createdAtIso
+          ).getTime() -
+          new Date(
+            a.createdAtIso
+          ).getTime()
+      );
+  }, [notes]);
 
   return (
     <NotesContext.Provider

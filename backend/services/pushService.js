@@ -1,4 +1,5 @@
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const EXPO_PUSH_URL =
+  'https://exp.host/--/api/v2/push/send';
 
 function isValidExpoPushToken(token) {
   if (typeof token !== 'string') {
@@ -16,9 +17,12 @@ async function sendExpoPushNotification({
   title,
   body,
   data = {},
+  channelId = 'daya-briefings-v1',
 }) {
   if (!isValidExpoPushToken(token)) {
-    throw new Error('Token Expo Push invalide ou manquant.');
+    throw new Error(
+      'Token Expo Push invalide ou manquant.'
+    );
   }
 
   const response = await fetch(EXPO_PUSH_URL, {
@@ -35,7 +39,7 @@ async function sendExpoPushNotification({
       body,
       data,
       priority: 'high',
-      channelId: 'default',
+      channelId,
     }),
   });
 

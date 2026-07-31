@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
-  ImageBackground,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -104,67 +104,70 @@ export default function HomeScreen() {
   }
 
   return (
-  <ImageBackground
-    source={require('../../assets/images/background.png')}
-    style={styles.backgroundImage}
-    resizeMode="cover"
-  >
-    <View style={styles.backgroundOverlay}>
-      <SafeAreaView
-        style={styles.container}
-        edges={['top', 'left', 'right']}
+  <View style={styles.screen}>
+    <Image
+      source={require('../../assets/images/background.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    />
+
+    <View style={styles.backgroundOverlay} />
+
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
+      <HomeMenu
+        onOpenNotes={() => router.push('/notes')}
+        onOpenReminders={() => router.push('/reminders')}
+        onOpenArchives={() => router.push('/archives')}
+        onOpenSettings={() => router.push('/settings')}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
       >
-        <HomeMenu
-          onOpenNotes={() => router.push('/notes')}
-          onOpenReminders={() => router.push('/reminders')}
-          onOpenArchives={() => router.push('/archives')}
-          onOpenSettings={() => router.push('/settings')}
+        <HeroCard
+          userName={
+            profile?.first_name ||
+            user.email?.split('@')[0] ||
+            'Utilisateur'
+          }
         />
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.content}
-        >
-          <HeroCard
-            userName={
-              profile?.first_name ||
-              user.email?.split('@')[0] ||
-              'Utilisateur'
-            }
-          />
-
-          <QuickCaptureCard
-            note={note}
-            setNote={setNote}
-            onAddNote={addNote}
-            loading={saving}
-          />
-
-          <RecentNotesPreview
-            notes={pendingNotes
-              .filter((item) => item.type === 'note')
-              .slice(0, 2)}
-            onSeeAll={() => router.push('/notes')}
-          />
-
-          <NextReminderCard
-            reminders={scheduledReminders.slice(0, 3)}
-            onSeeAll={() => router.push('/reminders')}
-          />
-        </ScrollView>
-
-        <FloatingMemoryButton
-          onPress={() => setMemoryOpen(true)}
+        <QuickCaptureCard
+          note={note}
+          setNote={setNote}
+          onAddNote={addNote}
+          loading={saving}
         />
 
-        <MemoryAssistantSheet
-          visible={memoryOpen}
-          onClose={() => setMemoryOpen(false)}
+        <RecentNotesPreview
+          notes={pendingNotes
+            .filter((item) => item.type === 'note')
+            .slice(0, 2)}
+          onSeeAll={() => router.push('/notes')}
         />
-      </SafeAreaView>
-    </View>
-  </ImageBackground>
+
+        <NextReminderCard
+          reminders={scheduledReminders.slice(0, 3)}
+          onSeeAll={() => router.push('/reminders')}
+        />
+      </ScrollView>
+
+      <FloatingMemoryButton
+        onPress={() => setMemoryOpen(true)}
+      />
+
+      <MemoryAssistantSheet
+        visible={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+      />
+    </SafeAreaView>
+  </View>
 );
 }
 
@@ -184,25 +187,49 @@ function LoadingScreen({ message }: { message: string }) {
 
 const styles = StyleSheet.create({
 
-  backgroundImage: {
+  screen: {
   flex: 1,
+  width: '100%',
+  overflow: 'hidden',
+  backgroundColor: '#F6F8FC',
+},
+
+backgroundImage: {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
 },
 
 backgroundOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(246, 248, 252, 0.88)',
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  backgroundColor: 'rgba(246, 248, 252, 0.82)',
 },
 
-  container: {
+container: {
   flex: 1,
+  width: '100%',
   backgroundColor: 'transparent',
 },
 
-  content: {
-    paddingHorizontal: 22,
-    paddingTop: 90,
-    paddingBottom: 110,
-  },
+scrollView: {
+  flex: 1,
+  width: '100%',
+},
+
+content: {
+  width: '100%',
+  paddingHorizontal: 22,
+  paddingTop: 90,
+  paddingBottom: 110,
+},
 
   loadingContainer: {
     flex: 1,
