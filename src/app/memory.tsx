@@ -1,22 +1,22 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import {
-    getLivingMemory,
-    LivingMemoryItem,
-    LivingMemoryProfile,
-    refreshLivingMemory,
+  getLivingMemory,
+  LivingMemoryItem,
+  LivingMemoryProfile,
+  refreshLivingMemory,
 } from '../services/livingMemoryService';
 
 type MemorySectionProps = {
@@ -133,28 +133,64 @@ export default function MemoryScreen() {
   const accessToken = session?.access_token;
 
   const loadMemory = useCallback(async () => {
-    if (!accessToken) {
-      setInitialLoading(false);
-      return;
-    }
+  if (!accessToken) {
+    setInitialLoading(false);
+    return;
+  }
 
-    setErrorMessage('');
+  setErrorMessage('');
 
-    const result = await getLivingMemory(accessToken);
+  try {
+    /**
+     * À chaque ouverture de la page, le backend vérifie
+     * si une nouvelle note existe.
+     *
+     * Sans nouvelle note :
+     * il retourne directement le profil existant.
+     *
+     * Avec une nouvelle note :
+     * il reconstruit automatiquement la mémoire.
+     */
+    const result =
+      await refreshLivingMemory(accessToken);
 
     if (!result.success) {
+      /**
+       * Si l'actualisation rencontre un problème,
+       * on essaie au moins d'afficher la dernière
+       * mémoire déjà enregistrée.
+       */
+      const fallbackResult =
+        await getLivingMemory(accessToken);
+
+      if (fallbackResult.success) {
+        setMemory(
+          fallbackResult.memory ?? null
+        );
+      }
+
       setErrorMessage(
         result.error ||
-          'Impossible de charger la mémoire vivante.'
+          'Impossible d’actualiser la mémoire vivante.'
       );
 
-      setInitialLoading(false);
       return;
     }
 
     setMemory(result.memory ?? null);
+  } catch (error) {
+    console.error(
+      'Erreur pendant le chargement automatique de la mémoire :',
+      error
+    );
+
+    setErrorMessage(
+      'Impossible de contacter le serveur.'
+    );
+  } finally {
     setInitialLoading(false);
-  }, [accessToken]);
+  }
+}, [accessToken]);
 
   useEffect(() => {
     if (loading) {

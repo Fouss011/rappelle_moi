@@ -212,75 +212,40 @@ async function notificationsAreAllowed() {
   );
 }
 
-async function scheduleReminderNotification(
-  text: string,
-  reminderDate: Date
-): Promise<{
-  notificationId: string;
-  notifyDate: Date;
-} | null> {
+async function cancelLegacyPersonalReminderNotifications() {
   if (Platform.OS === 'web') {
-    return null;
+    return;
   }
-
-  if (!isValidFutureDate(reminderDate)) {
-    console.warn(
-      'Notification ignorée, car la date du rappel est invalide ou passée :',
-      reminderDate
-    );
-
-    return null;
-  }
-
-  const allowed = await notificationsAreAllowed();
-
-  if (!allowed) {
-    console.warn(
-      "La note sera enregistrée, mais les notifications ne sont pas autorisées."
-    );
-
-    return null;
-  }
-
-  const notifyDate = resolveNotifyDate(reminderDate);
 
   try {
-    const notificationId =
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Daya',
-          body: text,
-          sound: 'default',
-          data: {
-            kind: 'personal_reminder',
-            reminderAtIso: reminderDate.toISOString(),
-          },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: notifyDate,
-          channelId: 'daya-reminders-v1',
-        },
-      });
+    const scheduledNotifications =
+      await Notifications.getAllScheduledNotificationsAsync();
 
-    console.log('Notification locale programmée :', {
-      notificationId,
-      reminderDate: reminderDate.toISOString(),
-      notifyDate: notifyDate.toISOString(),
-      text,
-    });
+    const personalReminderIds = scheduledNotifications
+      .filter((notification) => {
+        return (
+          notification.content.data?.kind ===
+          'personal_reminder'
+        );
+      })
+      .map((notification) => notification.identifier);
 
-    return {
-      notificationId,
-      notifyDate,
-    };
-  } catch (error) {
-    console.error(
-      'Erreur pendant la programmation de la notification :',
-      error
+    await Promise.all(
+      personalReminderIds.map((identifier) =>
+        Notifications.cancelScheduledNotificationAsync(
+          identifier
+        )
+      )
     );
 
-    return null;
+    console.log(
+      `${personalReminderIds.length} ancien(s) rappel(s) local(aux) annulé(s).`
+    );
+  } catch (error) {
+    console.warn(
+      "Impossible d'annuler les anciens rappels locaux :",
+      error
+    );
   }
 }
 
@@ -631,6 +596,14 @@ export function NotesProvider({
   const [notesLoaded, setNotesLoaded] = useState(false);
 
   const { user, session } = useAuth();
+  
+  useEffect(() => {
+  if (!user) {
+    return;
+  }
+
+  void cancelLegacyPersonalReminderNotifications();
+}, [user]);
 
   const saveNoteToSupabase = useCallback(
     async (item: Note) => {
@@ -858,21 +831,14 @@ if (aiHasTime) {
   detected = detectReminderTime(cleanText);
 }
 
-let scheduledNotification: {
-  notificationId: string;
-  notifyDate: Date;
-} | null = null;
-
-if (detected) {
-  scheduledNotification =
-    await scheduleReminderNotification(
-      cleanText,
-      detected.reminderDate
-    );
-}
-
+/**
+ * Le rappel personnel est désormais envoyé
+ * par le backend via Expo Push Token.
+ *
+ * Le frontend calcule et enregistre seulement
+ * l'heure à laquelle le backend doit l'envoyer.
+ */
 const finalNotifyDate =
-  scheduledNotification?.notifyDate ??
   detected?.notifyDate;
 
 const now = new Date();
@@ -929,8 +895,7 @@ const now = new Date();
         notifyAtIso:
           finalNotifyDate?.toISOString(),
 
-        notificationId:
-          scheduledNotification?.notificationId,
+        notificationId: undefined,
 
         isImportant: false,
         isDone: false,

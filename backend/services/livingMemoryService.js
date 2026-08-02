@@ -383,11 +383,41 @@ async function refreshLivingMemory(userId) {
   }
 
   const existingProfile =
-    await getLivingMemory(userId);
+  await getLivingMemory(userId);
 
-  const allowedNoteIds = new Set(
-    userNotes.map((note) => note.id)
-  );
+const latestNoteDate =
+  userNotes[0]?.created_at_iso ?? null;
+
+/**
+ * Si aucune nouvelle note n'a été ajoutée depuis
+ * la dernière analyse, on renvoie directement
+ * le profil existant sans rappeler OpenAI.
+ */
+if (
+  existingProfile &&
+  latestNoteDate &&
+  existingProfile.last_source_note_at
+) {
+  const latestNoteTimestamp =
+    new Date(latestNoteDate).getTime();
+
+  const lastAnalysedTimestamp =
+    new Date(
+      existingProfile.last_source_note_at
+    ).getTime();
+
+  if (
+    !Number.isNaN(latestNoteTimestamp) &&
+    !Number.isNaN(lastAnalysedTimestamp) &&
+    latestNoteTimestamp <= lastAnalysedTimestamp
+  ) {
+    return existingProfile;
+  }
+}
+
+const allowedNoteIds = new Set(
+  userNotes.map((note) => note.id)
+);
 
   /**
    * On envoie une version claire des notes à l'IA.
@@ -761,9 +791,6 @@ Construis maintenant le nouveau profil de mémoire vivante.
       recurringTopics,
       openLoops,
     });
-
-  const latestNoteDate =
-    userNotes[0]?.created_at_iso ?? null;
 
   const nowIso = new Date().toISOString();
 
