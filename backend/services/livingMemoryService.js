@@ -309,7 +309,11 @@ async function getLivingMemory(userId) {
   return data;
 }
 
-async function refreshLivingMemory(userId) {
+async function refreshLivingMemory(
+  userId,
+  options = {}
+) {
+  const force = options.force === true;
   if (!userId) {
     throw new Error(
       'Utilisateur non identifié pour la mémoire vivante.'
@@ -394,6 +398,7 @@ const latestNoteDate =
  * le profil existant sans rappeler OpenAI.
  */
 if (
+  !force &&
   existingProfile &&
   latestNoteDate &&
   existingProfile.last_source_note_at

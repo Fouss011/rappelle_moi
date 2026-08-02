@@ -243,6 +243,34 @@ async function markReminderFailed(
   }
 }
 
+async function markReminderIgnored(
+  noteId,
+  reason
+) {
+  const nowIso = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('notes')
+    .update({
+      push_status: 'failed',
+      push_attempts: MAX_ATTEMPTS,
+      push_processing_at: null,
+      push_receipt_status: 'push_disabled',
+      push_receipt_checked_at: nowIso,
+      push_last_error: String(
+        reason || 'Rappel ignoré.'
+      ).slice(0, 800),
+    })
+    .eq('id', noteId);
+
+  if (error) {
+    console.error(
+      `Impossible de neutraliser le rappel ${noteId} :`,
+      error.message
+    );
+  }
+}
+
 async function disableInvalidPushToken(
   userId,
   token
@@ -309,14 +337,19 @@ async function processDueReminders() {
       );
 
       if (!profile?.push_enabled) {
-        results.push({
-          noteId: note.id,
-          status: 'skipped',
-          reason:
-            'Push désactivé pour cet utilisateur.',
-        });
-        continue;
-      }
+  await markReminderIgnored(
+    note.id,
+    'Push désactivé pour cet utilisateur.'
+  );
+
+  results.push({
+    noteId: note.id,
+    status: 'skipped',
+    reason: 'Push désactivé pour cet utilisateur.',
+  });
+
+  continue;
+}
 
       if (
         !isValidExpoPushToken(

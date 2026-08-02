@@ -10,6 +10,7 @@ import {
 import { Platform } from 'react-native';
 
 import { analyseNoteWithAI } from '../services/aiNoteService';
+import { refreshLivingMemory } from '../services/livingMemoryService';
 import { supabase } from '../services/supabase';
 import { detectCategory } from '../utils/categoryUtils';
 import { detectSmartReminder } from '../utils/smartReminderUtils';
@@ -400,6 +401,25 @@ export function NotesProvider({
   const [saving, setSaving] = useState(false);
 
   const { user, session } = useAuth();
+
+  const refreshMemoryInBackground = useCallback(() => {
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      return;
+    }
+
+    void refreshLivingMemory(accessToken, {
+      force: true,
+    }).then((result) => {
+      if (!result.success) {
+        console.warn(
+          'La mémoire vivante n’a pas pu être actualisée :',
+          result.error
+        );
+      }
+    });
+  }, [session?.access_token]);
   
   useEffect(() => {
     if (!user) {
@@ -453,7 +473,11 @@ export function NotesProvider({
           "Erreur pendant l'enregistrement de la note :",
           error.message
         );
+
+        return false;
       }
+
+      return true;
     },
     [user]
   );
@@ -694,7 +718,12 @@ const now = new Date();
         ...currentNotes,
       ]);
 
-      await saveNoteToSupabase(newNote);
+      const saved =
+        await saveNoteToSupabase(newNote);
+
+      if (saved) {
+        refreshMemoryInBackground();
+      }
 
       setNote('');
     } catch (error) {
@@ -708,6 +737,7 @@ const now = new Date();
   }, [
     note,
     saveNoteToSupabase,
+    refreshMemoryInBackground,
     saving,
     user,
     session?.access_token,
@@ -756,9 +786,12 @@ const now = new Date();
           'Erreur pendant la suppression de la note :',
           error.message
         );
+        return;
       }
+
+      refreshMemoryInBackground();
     },
-    [notes, user]
+    [notes, refreshMemoryInBackground, user]
   );
 
   const toggleDone = useCallback(
@@ -814,9 +847,12 @@ const now = new Date();
           'Erreur pendant la modification de la note :',
           error.message
         );
+        return;
       }
+
+      refreshMemoryInBackground();
     },
-    [notes, user]
+    [notes, refreshMemoryInBackground, user]
   );
 
   const toggleImportant = useCallback(
@@ -856,9 +892,12 @@ const now = new Date();
           'Erreur pendant la modification de l’importance :',
           error.message
         );
+        return;
       }
+
+      refreshMemoryInBackground();
     },
-    [notes, user]
+    [notes, refreshMemoryInBackground, user]
   );
 
   const scheduledReminders = useMemo(() => {

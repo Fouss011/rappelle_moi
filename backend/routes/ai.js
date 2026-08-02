@@ -159,9 +159,13 @@ router.post(
   requireUser,
   async (req, res) => {
     try {
+      const force =
+        req.body?.force === true;
+
       const memory =
         await refreshLivingMemory(
-          req.user.id
+          req.user.id,
+          { force }
         );
 
       return res.json({

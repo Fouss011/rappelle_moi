@@ -83,7 +83,8 @@ export async function getLivingMemory(
 }
 
 export async function refreshLivingMemory(
-  accessToken: string
+  accessToken: string,
+  options: { force?: boolean } = {}
 ): Promise<LivingMemoryResponse> {
   try {
     const response = await fetch(
@@ -94,7 +95,9 @@ export async function refreshLivingMemory(
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          force: Boolean(options.force),
+        }),
       }
     );
 
