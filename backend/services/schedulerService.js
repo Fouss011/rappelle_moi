@@ -4,6 +4,7 @@ const {
   startMorningRoutine,
   startNightRoutine,
 } = require('./assistantService');
+const { processDueReminders } = require('./reminderPushService');
 
 function startScheduler() {
   cron.schedule(
@@ -49,6 +50,28 @@ function startScheduler() {
       } catch (error) {
         console.error(
           '❌ Erreur routine du matin :',
+          error.message
+        );
+      }
+    },
+    {
+      timezone: 'Europe/Paris',
+    }
+  );
+
+
+  cron.schedule(
+    '* * * * *',
+    async () => {
+      try {
+        const result = await processDueReminders();
+
+        if (result.remindersFound > 0 || result.failed > 0) {
+          console.log('🔔 Rappels personnels traités :', result);
+        }
+      } catch (error) {
+        console.error(
+          '❌ Erreur traitement des rappels personnels :',
           error.message
         );
       }

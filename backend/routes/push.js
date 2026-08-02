@@ -9,6 +9,9 @@ const {
   startMorningRoutine,
   startNightRoutine,
 } = require('../services/assistantService');
+const {
+  processDueReminders,
+} = require('../services/reminderPushService');
 
 const router = express.Router();
 
@@ -192,5 +195,24 @@ router.post('/run-evening', requireAdminKey, async (_req, res) => {
 });
 
 
+
+router.post('/run-reminders', requireAdminKey, async (_req, res) => {
+  try {
+    const result = await processDueReminders();
+
+    return res.json({
+      success: true,
+      routine: 'personal-reminders',
+      ...result,
+    });
+  } catch (error) {
+    console.error('Erreur exécution manuelle rappels :', error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 
 module.exports = router;

@@ -15,21 +15,35 @@ type Profile = {
   first_name: string | null;
 };
 
+type SignUpResult = {
+  error: string | null;
+  requiresEmailConfirmation: boolean;
+};
+
 type AuthContextValue = {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<string | null>;
+
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<string | null>;
+
   signUp: (
     firstName: string,
     email: string,
     password: string
-  ) => Promise<string | null>;
+  ) => Promise<SignUpResult>;
+
+  resetPassword: (
+  email: string
+) => Promise<string | null>;
+
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
-
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -210,73 +224,155 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loadProfile]
   );
 
-  const signUp = useCallback(
-    async (
-      firstName: string,
-      email: string,
-      password: string
-    ): Promise<string | null> => {
-      try {
-        setLoading(true);
+ const signUp = useCallback(
+  async (
+    firstName: string,
+    email: string,
+    password: string
+  ): Promise<SignUpResult> => {
+    try {
+      setLoading(true);
 
-        const cleanFirstName = firstName.trim();
-        const cleanEmail = email.trim().toLowerCase();
+      const cleanFirstName =
+        firstName.trim();
 
-        const { data, error } = await supabase.auth.signUp({
+      const cleanEmail =
+        email.trim().toLowerCase();
+
+      const { data, error } =
+        await supabase.auth.signUp({
           email: cleanEmail,
           password,
+
+          options: {
+            data: {
+              first_name:
+                cleanFirstName,
+            },
+          },
         });
 
-        if (error) {
-          return error.message;
+      if (error) {
+        return {
+          error: error.message,
+          requiresEmailConfirmation:
+            false,
+        };
+      }
+
+      const newUser =
+        data.user ?? null;
+
+      const newSession =
+        data.session ?? null;
+
+      if (!newUser?.id) {
+        return {
+          error:
+            "Le compte a été créé, mais l'utilisateur n'a pas été retourné.",
+          requiresEmailConfirmation:
+            false,
+        };
+      }
+
+      /**
+       * Si la confirmation d’email est activée,
+       * le compte existe mais aucune session
+       * n’est encore ouverte.
+       */
+      if (!newSession) {
+        if (mountedRef.current) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
         }
 
-        const newUser = data.user ?? null;
-        const newSession = data.session ?? null;
+        return {
+          error: null,
+          requiresEmailConfirmation:
+            true,
+        };
+      }
 
-        if (!newUser?.id) {
-          return "Le compte a été créé, mais l'utilisateur n'a pas été retourné.";
-        }
-
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              id: newUser.id,
-              first_name: cleanFirstName,
-            },
-            {
-              onConflict: 'id',
-            }
-          );
-
-        if (profileError) {
-          return profileError.message;
-        }
-
+      if (mountedRef.current) {
         setSession(newSession);
         setUser(newUser);
-        setProfile({
-          id: newUser.id,
-          first_name: cleanFirstName,
-        });
+      }
 
-        return null;
-      } catch (error) {
-        console.error(
-          "Erreur inattendue pendant la création du compte :",
-          error
+      await loadProfile(newUser.id);
+
+      return {
+        error: null,
+        requiresEmailConfirmation:
+          false,
+      };
+    } catch (error) {
+      console.error(
+        "Erreur inattendue pendant la création du compte :",
+        error
+      );
+
+      return {
+        error:
+          'Une erreur inattendue est survenue pendant la création du compte.',
+        requiresEmailConfirmation:
+          false,
+      };
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  },
+  [loadProfile]
+);
+
+const resetPassword = useCallback(
+  async (
+    email: string
+  ): Promise<string | null> => {
+    try {
+      setLoading(true);
+
+      const cleanEmail =
+        email.trim().toLowerCase();
+
+      if (!cleanEmail) {
+        return 'Entre ton adresse email.';
+      }
+
+      const { error } =
+        await supabase.auth.resetPasswordForEmail(
+          cleanEmail,
+          {
+            redirectTo:
+              'daya://reset-password',
+          }
         );
 
-        return 'Une erreur inattendue est survenue pendant la création du compte.';
-      } finally {
-        if (mountedRef.current) {
-          setLoading(false);
-        }
+      if (error) {
+        return error.message;
       }
-    },
-    []
-  );
+
+      return null;
+    } catch (error) {
+      console.error(
+        'Erreur pendant la demande de réinitialisation :',
+        error
+      );
+
+      return (
+        'Impossible d’envoyer l’email de ' +
+        'réinitialisation pour le moment.'
+      );
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  },
+  []
+);
 
   const signOut = useCallback(async () => {
     try {
@@ -306,6 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signIn,
         signUp,
+        resetPassword,
         signOut,
         refreshProfile,
       }}
