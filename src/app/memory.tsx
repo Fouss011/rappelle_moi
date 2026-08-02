@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppBackground } from '../components/AppBackground';
 
 import { useAuth } from '../context/AuthContext';
 import {
@@ -280,6 +281,7 @@ export default function MemoryScreen() {
   }
 
   return (
+  <AppBackground>
     <SafeAreaView
       style={styles.safeArea}
       edges={['top', 'left', 'right']}
@@ -477,13 +479,14 @@ export default function MemoryScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F6F8FC',
+    backgroundColor: 'transparent',
   },
 
   loadingScreen: {

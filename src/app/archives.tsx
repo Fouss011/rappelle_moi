@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { Note, useNotes } from '../context/NotesContext';
 
 type ArchiveGroup = {
@@ -178,6 +179,7 @@ export default function ArchivesScreen() {
   }, [notes, search, showAll]);
 
   return (
+  <AppBackground>
     <SafeAreaView
       style={styles.container}
       edges={['top', 'left', 'right']}
@@ -324,14 +326,15 @@ export default function ArchivesScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F6F8FC',
-  },
+  flex: 1,
+  backgroundColor: 'transparent',
+},
 
   content: {
     padding: 22,

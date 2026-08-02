@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { useAuth } from '../context/AuthContext';
+
 
 type PermissionState = 'loading' | 'granted' | 'denied' | 'undetermined';
 
@@ -337,6 +339,7 @@ export default function SettingsScreen() {
   })();
 
   return (
+   <AppBackground>
     <SafeAreaView
       style={styles.container}
       edges={['top', 'left', 'right']}
@@ -517,13 +520,14 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+   </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F8FC',
+    backgroundColor: 'transparent',
   },
 
   content: {

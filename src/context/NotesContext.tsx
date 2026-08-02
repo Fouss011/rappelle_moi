@@ -198,20 +198,6 @@ function isValidFutureDate(date: Date) {
   );
 }
 
-async function notificationsAreAllowed() {
-  if (Platform.OS === 'web') {
-    return false;
-  }
-
-  const permissions =
-    await Notifications.getPermissionsAsync();
-
-  return (
-    permissions.granted ||
-    permissions.status === 'granted'
-  );
-}
-
 async function cancelLegacyPersonalReminderNotifications() {
   if (Platform.OS === 'web') {
     return;
@@ -249,133 +235,6 @@ async function cancelLegacyPersonalReminderNotifications() {
   }
 }
 
-function buildMorningText(notes: Note[]) {
-  const now = Date.now();
-
-  const upcomingReminders = notes
-    .filter((item) => {
-      if (item.isDone || !item.reminderAtIso) {
-        return false;
-      }
-
-      const reminderTime = new Date(
-        item.reminderAtIso
-      ).getTime();
-
-      return (
-        !Number.isNaN(reminderTime) &&
-        reminderTime > now
-      );
-    })
-    .sort((a, b) => {
-      return (
-        new Date(a.reminderAtIso!).getTime() -
-        new Date(b.reminderAtIso!).getTime()
-      );
-    });
-
-  if (upcomingReminders.length === 0) {
-    return 'Bonjour 👋 Aucun rappel à venir pour le moment.';
-  }
-
-  const firstReminders = upcomingReminders.slice(0, 3);
-
-  const details = firstReminders
-    .map((item) => {
-      const date = new Date(item.reminderAtIso!);
-
-      const day = date.toLocaleDateString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-      });
-
-      const time = date.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      return `${item.title || item.text} — ${day} à ${time}`;
-    })
-    .join(' • ');
-
-  const remainingCount =
-    upcomingReminders.length - firstReminders.length;
-
-  return remainingCount > 0
-    ? `Bonjour 👋 Tes prochains rappels : ${details} • Et ${remainingCount} autre(s).`
-    : `Bonjour 👋 Tes prochains rappels : ${details}`;
-}
-
-function buildEveningText(notes: Note[]) {
-  const now = Date.now();
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
-
-  const doneToday = notes.filter((item) => {
-    if (!item.isDone) {
-      return false;
-    }
-
-    const creationTime = new Date(
-      item.createdAtIso
-    ).getTime();
-
-    return (
-      !Number.isNaN(creationTime) &&
-      creationTime >= todayStart.getTime() &&
-      creationTime <= todayEnd.getTime()
-    );
-  }).length;
-
-  const upcomingReminders = notes
-    .filter((item) => {
-      if (item.isDone || !item.reminderAtIso) {
-        return false;
-      }
-
-      const reminderTime = new Date(
-        item.reminderAtIso
-      ).getTime();
-
-      return (
-        !Number.isNaN(reminderTime) &&
-        reminderTime > now
-      );
-    })
-    .sort((a, b) => {
-      return (
-        new Date(a.reminderAtIso!).getTime() -
-        new Date(b.reminderAtIso!).getTime()
-      );
-    });
-
-  if (upcomingReminders.length === 0) {
-    return `Bonsoir 👋 ${doneToday} élément(s) créés aujourd’hui sont terminés. Aucun rappel à venir.`;
-  }
-
-  const nextReminder = upcomingReminders[0];
-  const nextDate = new Date(
-    nextReminder.reminderAtIso!
-  );
-
-  const day = nextDate.toLocaleDateString('fr-FR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-  });
-
-  const time = nextDate.toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return `Bonsoir 👋 ${doneToday} élément(s) créés aujourd’hui sont terminés. ${upcomingReminders.length} rappel(s) à venir. Prochain : ${nextReminder.title || nextReminder.text} — ${day} à ${time}.`;
-}
-
 async function cancelDailyNotifications() {
   if (Platform.OS === 'web') {
     return;
@@ -401,60 +260,6 @@ async function cancelDailyNotifications() {
         identifier
       )
     )
-  );
-}
-
-async function scheduleDailyNotifications(
-  notes: Note[]
-) {
-  if (Platform.OS === 'web') {
-    return;
-  }
-
-  const allowed = await notificationsAreAllowed();
-
-  if (!allowed) {
-    return;
-  }
-
-  await cancelDailyNotifications();
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Daya',
-      body: buildMorningText(notes),
-      sound: 'default',
-      data: {
-        kind: 'daily_morning',
-      },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 8,
-      minute: 0,
-      channelId: 'daya-briefings-v1',
-    },
-  });
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Daya',
-      body: buildEveningText(notes),
-      sound: 'default',
-      data: {
-        kind: 'daily_evening',
-      },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 21,
-      minute: 0,
-      channelId: 'daya-briefings-v1',
-    },
-  });
-
-  console.log(
-    'Notifications quotidiennes programmées pour 8 h et 21 h.'
   );
 }
 
@@ -593,17 +398,19 @@ export function NotesProvider({
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [saving, setSaving] = useState(false);
-  const [notesLoaded, setNotesLoaded] = useState(false);
 
   const { user, session } = useAuth();
   
   useEffect(() => {
-  if (!user) {
-    return;
-  }
+    if (!user) {
+      return;
+    }
 
-  void cancelLegacyPersonalReminderNotifications();
-}, [user]);
+    void Promise.all([
+      cancelLegacyPersonalReminderNotifications(),
+      cancelDailyNotifications(),
+    ]);
+  }, [user]);
 
   const saveNoteToSupabase = useCallback(
     async (item: Note) => {
@@ -654,11 +461,8 @@ export function NotesProvider({
   const loadNotes = useCallback(async () => {
     if (!user) {
       setNotes([]);
-      setNotesLoaded(true);
       return;
     }
-
-    setNotesLoaded(false);
 
     try {
       const { data, error } = await supabase
@@ -721,28 +525,12 @@ export function NotesProvider({
       );
 
       setNotes([]);
-    } finally {
-      setNotesLoaded(true);
     }
   }, [user]);
 
   useEffect(() => {
     void loadNotes();
   }, [loadNotes]);
-
-  useEffect(() => {
-    if (!user || !notesLoaded) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      void scheduleDailyNotifications(notes);
-    }, 500);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [notes, notesLoaded, user]);
 
   const addNote = useCallback(async () => {
     const cleanText = note.trim();

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppBackground } from '../components/AppBackground';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen() {
@@ -116,7 +117,7 @@ export default function LoginScreen() {
     router.replace('/');
   };
 
-  const handleForgotPassword = async () => {
+ const handleForgotPassword = async () => {
   const cleanEmail =
     email.trim().toLowerCase();
 
@@ -162,6 +163,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <AppBackground>
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>
@@ -284,13 +286,14 @@ export default function LoginScreen() {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+  </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F8FC',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     padding: 22,
   },

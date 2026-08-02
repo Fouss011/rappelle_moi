@@ -4,7 +4,11 @@ const {
   startMorningRoutine,
   startNightRoutine,
 } = require('./assistantService');
-const { processDueReminders } = require('./reminderPushService');
+
+const {
+  processDueReminders,
+  processPendingReceipts,
+} = require('./reminderPushService');
 
 function startScheduler() {
   cron.schedule(
@@ -15,7 +19,8 @@ function startScheduler() {
       );
 
       try {
-        const results = await startNightRoutine();
+        const results =
+          await startNightRoutine();
 
         console.log(
           '✅ Routine du soir terminée :',
@@ -41,7 +46,8 @@ function startScheduler() {
       );
 
       try {
-        const results = await startMorningRoutine();
+        const results =
+          await startMorningRoutine();
 
         console.log(
           '✅ Routine du matin terminée :',
@@ -59,15 +65,21 @@ function startScheduler() {
     }
   );
 
-
   cron.schedule(
     '* * * * *',
     async () => {
       try {
-        const result = await processDueReminders();
+        const result =
+          await processDueReminders();
 
-        if (result.remindersFound > 0 || result.failed > 0) {
-          console.log('🔔 Rappels personnels traités :', result);
+        if (
+          result.remindersFound > 0 ||
+          result.failed > 0
+        ) {
+          console.log(
+            '🔔 Rappels personnels envoyés à Expo :',
+            result
+          );
         }
       } catch (error) {
         console.error(
@@ -81,7 +93,37 @@ function startScheduler() {
     }
   );
 
-  console.log('⏰ Scheduler Daya actif');
+  cron.schedule(
+    '*/5 * * * *',
+    async () => {
+      try {
+        const result =
+          await processPendingReceipts();
+
+        if (
+          result.receiptsFound > 0 ||
+          result.failed > 0
+        ) {
+          console.log(
+            '🧾 Reçus Expo Push vérifiés :',
+            result
+          );
+        }
+      } catch (error) {
+        console.error(
+          '❌ Erreur vérification des reçus Expo :',
+          error.message
+        );
+      }
+    },
+    {
+      timezone: 'Europe/Paris',
+    }
+  );
+
+  console.log(
+    '⏰ Scheduler Daya actif : 8 h, 21 h, rappels chaque minute, reçus toutes les 5 minutes.'
+  );
 }
 
 module.exports = {

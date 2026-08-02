@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
+import { AppBackground } from '../components/AppBackground';
 import { supabase } from '../services/supabase';
 
 export default function ResetPasswordScreen() {
@@ -169,7 +170,8 @@ export default function ResetPasswordScreen() {
   };
 
   if (checkingSession) {
-    return (
+  return (
+    <AppBackground>
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
 
@@ -181,11 +183,13 @@ export default function ResetPasswordScreen() {
           Daya prépare la modification de ton mot de passe.
         </Text>
       </SafeAreaView>
-    );
-  }
+    </AppBackground>
+  );
+}
 
   if (!sessionAvailable) {
-    return (
+  return (
+    <AppBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.card}>
           <Text style={styles.icon}>🔐</Text>
@@ -209,10 +213,12 @@ export default function ResetPasswordScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    );
-  }
+    </AppBackground>
+  );
+}
 
   return (
+  <AppBackground>
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.icon}>🔐</Text>
@@ -288,24 +294,25 @@ export default function ResetPasswordScreen() {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
-  );
+  </AppBackground>
+);
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 22,
-    backgroundColor: '#F6F8FC',
-  },
+  flex: 1,
+  justifyContent: 'center',
+  padding: 22,
+  backgroundColor: 'transparent',
+},
 
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: '#F6F8FC',
-  },
+loadingContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 24,
+  backgroundColor: 'transparent',
+},
 
   loadingTitle: {
     marginTop: 18,
@@ -327,7 +334,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 1,
     borderColor: '#E6ECF5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
 
   icon: {
@@ -357,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E6ECF5',
-    backgroundColor: '#F8FBFF',
+    backgroundColor: 'transparent',
     color: '#0F172A',
     fontSize: 15,
     fontWeight: '700',
@@ -377,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: '#2563EB',
+    backgroundColor: 'transparent',
   },
 
   buttonDisabled: {
@@ -408,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'transparent',
   },
 
   secondaryButtonText: {

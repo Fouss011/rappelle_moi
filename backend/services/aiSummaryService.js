@@ -1,4 +1,3 @@
-const openai = require('../config/openai');
 const supabase = require('../config/supabase');
 
 function getDateKey(date, timezone = 'Europe/Paris') {
@@ -10,11 +9,7 @@ function getDateKey(date, timezone = 'Europe/Paris') {
   }).format(date);
 }
 
-function belongsToLocalDay(
-  isoDate,
-  expectedDateKey,
-  timezone
-) {
+function belongsToLocalDay(isoDate, expectedDateKey, timezone) {
   if (!isoDate) {
     return false;
   }
@@ -28,42 +23,38 @@ function belongsToLocalDay(
   return getDateKey(date, timezone) === expectedDateKey;
 }
 
-async function generateSummary(notes) {
-  if (!notes || notes.length === 0) {
-    return "Aucune nouvelle capture enregistrée aujourd'hui.";
+function formatReminder(reminder, timezone) {
+  const date = new Date(reminder.reminder_at_iso);
+  const label = reminder.title || reminder.text || 'Rappel';
+
+  const dateText = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: timezone,
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+  return `${label} — ${dateText}`;
+}
+
+function generateSummary({ todayNotes, upcomingReminders, timezone }) {
+  const doneToday = todayNotes.filter((item) => item.is_done).length;
+  const createdToday = todayNotes.length;
+
+  if (upcomingReminders.length === 0) {
+    return `Bonsoir 👋 ${createdToday} élément(s) créé(s) aujourd’hui, dont ${doneToday} terminé(s). Aucun rappel à venir.`;
   }
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content:
-          "Tu es Daya, l'assistant mémoire personnel de l'utilisateur. Tu résumes uniquement les données fournies, sans rien inventer.",
-      },
-      {
-        role: 'user',
-        content: `
-Voici les captures du jour :
+  const displayed = upcomingReminders.slice(0, 3);
+  const details = displayed
+    .map((item) => formatReminder(item, timezone))
+    .join(' • ');
 
-${JSON.stringify(notes, null, 2)}
+  const remaining = upcomingReminders.length - displayed.length;
+  const suffix = remaining > 0 ? ` • Et ${remaining} autre(s).` : '';
 
-Rédige un bilan très court en français :
-- maximum 350 caractères ;
-- commence par "Bonsoir 👋" ;
-- indique les éléments importants ;
-- indique les rappels encore à venir ;
-- ne cite aucun rappel passé ;
-- aucune mise en forme Markdown.
-`,
-      },
-    ],
-  });
-
-  return (
-    response.choices[0]?.message?.content?.trim() ||
-    'Bonsoir 👋 Ton bilan est disponible dans Daya.'
-  );
+  return `Bonsoir 👋 ${createdToday} élément(s) créé(s) aujourd’hui, dont ${doneToday} terminé(s). ${upcomingReminders.length} rappel(s) à venir : ${details}${suffix}`.slice(0, 500);
 }
 
 async function generateAndSaveDailySummary(
@@ -76,11 +67,6 @@ async function generateAndSaveDailySummary(
 
   const todayKey = getDateKey(new Date(), timezone);
 
-  /*
-   * On récupère les notes récentes, puis on filtre selon
-   * la date locale de l’utilisateur. Cela évite les erreurs
-   * UTC autour de minuit.
-   */
   const { data: recentNotes, error } = await supabase
     .from('notes')
     .select('*')
@@ -92,18 +78,15 @@ async function generateAndSaveDailySummary(
     throw new Error(error.message);
   }
 
-  const todayNotes = (recentNotes ?? []).filter((item) =>
-    belongsToLocalDay(
-      item.created_at_iso,
-      todayKey,
-      timezone
-    )
-  );
-
+  const notes = recentNotes ?? [];
   const now = Date.now();
 
-  const upcomingReminders = (recentNotes ?? []).filter(
-    (item) => {
+  const todayNotes = notes.filter((item) =>
+    belongsToLocalDay(item.created_at_iso, todayKey, timezone)
+  );
+
+  const upcomingReminders = notes
+    .filter((item) => {
       if (
         item.is_done ||
         item.type !== 'reminder' ||
@@ -112,23 +95,21 @@ async function generateAndSaveDailySummary(
         return false;
       }
 
-      const reminderTime = new Date(
-        item.reminder_at_iso
-      ).getTime();
+      const reminderTime = new Date(item.reminder_at_iso).getTime();
 
-      return (
-        !Number.isNaN(reminderTime) &&
-        reminderTime > now
-      );
-    }
-  );
+      return !Number.isNaN(reminderTime) && reminderTime > now;
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.reminder_at_iso).getTime() -
+        new Date(b.reminder_at_iso).getTime()
+    );
 
-  const summaryInput = [
-    ...todayNotes,
-    ...upcomingReminders.slice(0, 5),
-  ];
-
-  const summary = await generateSummary(summaryInput);
+  const summary = generateSummary({
+    todayNotes,
+    upcomingReminders,
+    timezone,
+  });
 
   const summaryId = `${userId}-${todayKey}`;
 
@@ -140,18 +121,11 @@ async function generateAndSaveDailySummary(
         user_id: userId,
         summary_date: todayKey,
         summary_text: summary,
-
         total_notes: todayNotes.length,
-
-        important_count: todayNotes.filter(
-          (item) => item.is_important
-        ).length,
-
+        important_count: todayNotes.filter((item) => item.is_important)
+          .length,
         reminder_count: upcomingReminders.length,
-
-        done_count: todayNotes.filter(
-          (item) => item.is_done
-        ).length,
+        done_count: todayNotes.filter((item) => item.is_done).length,
       },
       {
         onConflict: 'id',

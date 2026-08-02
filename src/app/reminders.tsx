@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppBackground } from '../components/AppBackground';
 import { Note, useNotes } from '../context/NotesContext';
 
 type ReminderGroup = {
@@ -111,7 +112,8 @@ function groupReminders(items: Note[]): ReminderGroup[] {
         title: getReminderDayLabel(reminderDate),
         date: startOfDay(reminderDate),
         items: [],
-        isOverdue: reminderDate.getTime() < now.getTime(),
+        isOverdue:
+          reminderDate.getTime() < now.getTime(),
       });
     }
 
@@ -127,14 +129,47 @@ function groupReminders(items: Note[]): ReminderGroup[] {
   });
 
   return Array.from(groups.values())
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .sort((a, b) => {
+      /**
+       * Les journées contenant des rappels futurs
+       * passent avant les journées entièrement dépassées.
+       */
+      if (a.isOverdue !== b.isOverdue) {
+        return a.isOverdue ? 1 : -1;
+      }
+
+      /**
+       * Rappels à venir :
+       * la date la plus proche en premier.
+       */
+      if (!a.isOverdue && !b.isOverdue) {
+        return a.date.getTime() - b.date.getTime();
+      }
+
+      /**
+       * Rappels dépassés :
+       * le plus récent en premier.
+       */
+      return b.date.getTime() - a.date.getTime();
+    })
     .map((group) => ({
       ...group,
-      items: group.items.sort(
-        (a, b) =>
-          new Date(a.reminderAtIso ?? '').getTime() -
-          new Date(b.reminderAtIso ?? '').getTime()
-      ),
+
+      items: [...group.items].sort((a, b) => {
+        const dateA = new Date(
+          a.reminderAtIso ?? ''
+        ).getTime();
+
+        const dateB = new Date(
+          b.reminderAtIso ?? ''
+        ).getTime();
+
+        if (group.isOverdue) {
+          return dateB - dateA;
+        }
+
+        return dateA - dateB;
+      }),
     }));
 }
 
@@ -158,7 +193,8 @@ export default function RemindersScreen() {
   );
 
   return (
-    <SafeAreaView
+    <AppBackground>
+     <SafeAreaView
       style={styles.container}
       edges={['top', 'left', 'right']}
     >
@@ -275,14 +311,15 @@ export default function RemindersScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F6F8FC',
-  },
+  flex: 1,
+  backgroundColor: 'transparent',
+},
 
   content: {
     padding: 22,
