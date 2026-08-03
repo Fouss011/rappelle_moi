@@ -1,7 +1,9 @@
-const openai = require('../config/openai');
 const supabase = require('../config/supabase');
 
-function getDateKey(date, timezone = 'Europe/Paris') {
+function getDateKey(
+  date,
+  timezone = 'Europe/Paris'
+) {
   return new Intl.DateTimeFormat('fr-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -10,118 +12,158 @@ function getDateKey(date, timezone = 'Europe/Paris') {
   }).format(date);
 }
 
+function cleanReminderLabel(reminder) {
+  const title =
+    typeof reminder?.title === 'string'
+      ? reminder.title.trim()
+      : '';
+
+  const text =
+    typeof reminder?.text === 'string'
+      ? reminder.text.trim()
+      : '';
+
+  return title || text || 'Rappel Daya';
+}
+
+function formatReminderDate(
+  isoDate,
+  timezone
+) {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: timezone,
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(date)
+    .replace(',', ' à');
+}
+
+function getNoReminderMessage(dateKey) {
+  const messages = [
+    [
+      '☀️ Bonjour !',
+      "Aucun rappel aujourd'hui.",
+      '💡 Ne gardez plus tout en tête.',
+      'Confiez-le à Daya.',
+      'Belle journée !',
+    ],
+    [
+      '☀️ Bonjour !',
+      "Aucun rappel aujourd'hui.",
+      '💡 Une idée vous vient ?',
+      'Daya s’en souviendra.',
+      'Bonne journée !',
+    ],
+    [
+      '☀️ Bonjour !',
+      'Rien à signaler ce matin.',
+      '📝 Daya est là pour garder',
+      'ce qui compte pour vous.',
+      'Belle journée !',
+    ],
+  ];
+
+  const dayNumber = Number(
+    dateKey.replaceAll('-', '')
+  );
+
+  return messages[
+    dayNumber % messages.length
+  ].join('\n');
+}
+
 async function generateMorningBrief(
   userId,
   timezone = 'Europe/Paris'
 ) {
   if (!userId) {
-    throw new Error('userId manquant pour le briefing du matin.');
+    throw new Error(
+      'userId manquant pour le briefing du matin.'
+    );
   }
 
-  const { data: summaries, error: summariesError } = await supabase
-    .from('daily_summaries')
-    .select('*')
-    .eq('user_id', userId)
-    .order('summary_date', { ascending: false })
-    .limit(1);
+  const { data: notes, error } =
+    await supabase
+      .from('notes')
+      .select(`
+        id,
+        title,
+        text,
+        type,
+        reminder_at_iso,
+        is_done
+      `)
+      .eq('user_id', userId)
+      .eq('type', 'reminder')
+      .eq('is_done', false)
+      .not('reminder_at_iso', 'is', null)
+      .order('reminder_at_iso', {
+        ascending: true,
+      })
+      .limit(100);
 
-  if (summariesError) {
-    throw new Error(summariesError.message);
-  }
-
-  const { data: notes, error: notesError } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at_iso', { ascending: false })
-    .limit(100);
-
-  if (notesError) {
-    throw new Error(notesError.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
   const now = Date.now();
 
-  const upcomingReminders = (notes ?? [])
-    .filter((item) => {
-      if (
-        item.is_done ||
-        item.type !== 'reminder' ||
-        !item.reminder_at_iso
-      ) {
-        return false;
-      }
-
-      const reminderTime = new Date(item.reminder_at_iso).getTime();
+  const upcomingReminders =
+    (notes ?? []).filter((item) => {
+      const reminderTime =
+        new Date(
+          item.reminder_at_iso
+        ).getTime();
 
       return (
         !Number.isNaN(reminderTime) &&
         reminderTime > now
       );
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.reminder_at_iso).getTime() -
-        new Date(b.reminder_at_iso).getTime()
-    )
-    .slice(0, 5);
+    });
 
-  const pendingTasks = (notes ?? [])
-    .filter(
-      (item) =>
-        !item.is_done &&
-        item.type !== 'reminder'
-    )
-    .slice(0, 5);
+  const dateKey =
+    getDateKey(new Date(), timezone);
 
-  const yesterdaySummary =
-    summaries?.[0]?.summary_text ??
-    'Aucun résumé récent disponible.';
-
-  if (
-    upcomingReminders.length === 0 &&
-    pendingTasks.length === 0
-  ) {
-    return "Bonjour 👋 Tu n'as aucun rappel ni tâche urgente pour le moment.";
+  if (upcomingReminders.length === 0) {
+    return getNoReminderMessage(dateKey);
   }
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Tu es Daya, un assistant personnel. Prépare un briefing du matin très court, chaleureux et concret. N’invente rien.',
-      },
-      {
-        role: 'user',
-        content: `
-Date locale : ${getDateKey(new Date(), timezone)}
+  const nextReminder =
+    upcomingReminders[0];
 
-Résumé récent :
-${yesterdaySummary}
+  const nextLabel =
+    cleanReminderLabel(nextReminder);
 
-Rappels futurs :
-${JSON.stringify(upcomingReminders, null, 2)}
+  const nextDate =
+    formatReminderDate(
+      nextReminder.reminder_at_iso,
+      timezone
+    );
 
-Tâches non terminées :
-${JSON.stringify(pendingTasks, null, 2)}
+  const countLine =
+    upcomingReminders.length === 1
+      ? '📅 1 rappel à venir.'
+      : `📅 ${upcomingReminders.length} rappels à venir.`;
 
-Rédige une notification en français :
-- maximum 350 caractères ;
-- commence par "Bonjour 👋" ;
-- mentionne au maximum 3 priorités ;
-- n'inclus aucun rappel passé ;
-- aucune mise en forme Markdown.
-`,
-      },
-    ],
-  });
-
-  return (
-    response.choices[0]?.message?.content?.trim() ||
-    "Bonjour 👋 Consulte Daya pour retrouver tes priorités."
-  );
+  return [
+    '☀️ Bonjour !',
+    countLine,
+    nextDate
+      ? `Prochain : ${nextLabel} — ${nextDate}.`
+      : `Prochain : ${nextLabel}.`,
+    'Belle journée !',
+  ].join('\n');
 }
 
 module.exports = {

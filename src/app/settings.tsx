@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBackground } from '../components/AppBackground';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 
 
 type PermissionState = 'loading' | 'granted' | 'denied' | 'undetermined';
@@ -31,6 +33,113 @@ export default function SettingsScreen() {
   const [testing, setTesting] = useState(false);
   const [cancellingTests, setCancellingTests] = useState(false);
   const [testMessage, setTestMessage] = useState('');
+
+  const [morningBriefEnabled, setMorningBriefEnabled] =
+    useState(false);
+
+  const [eveningSummaryDaily, setEveningSummaryDaily] =
+    useState(false);
+
+  const [preferencesLoading, setPreferencesLoading] =
+    useState(true);
+
+  const [savingPreference, setSavingPreference] =
+    useState<'morning' | 'evening' | null>(null);
+
+  const loadNotificationPreferences =
+    useCallback(async () => {
+      if (!user?.id) {
+        setPreferencesLoading(false);
+        return;
+      }
+
+      setPreferencesLoading(true);
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(
+            'morning_brief_enabled, evening_summary_daily'
+          )
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        setMorningBriefEnabled(
+          data?.morning_brief_enabled === true
+        );
+
+        setEveningSummaryDaily(
+          data?.evening_summary_daily === true
+        );
+      } catch (error) {
+        console.error(
+          'Erreur chargement préférences notifications :',
+          error
+        );
+      } finally {
+        setPreferencesLoading(false);
+      }
+    }, [user?.id]);
+
+  const updateNotificationPreference = async (
+    preference:
+      | 'morning_brief_enabled'
+      | 'evening_summary_daily',
+    value: boolean
+  ) => {
+    if (!user?.id || savingPreference) {
+      return;
+    }
+
+    const key =
+      preference === 'morning_brief_enabled'
+        ? 'morning'
+        : 'evening';
+
+    setSavingPreference(key);
+
+    if (key === 'morning') {
+      setMorningBriefEnabled(value);
+    } else {
+      setEveningSummaryDaily(value);
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          [preference]: value,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error(
+        'Erreur enregistrement préférence notification :',
+        error
+      );
+
+      if (key === 'morning') {
+        setMorningBriefEnabled(!value);
+      } else {
+        setEveningSummaryDaily(!value);
+      }
+
+      Alert.alert(
+        'Erreur',
+        "La préférence n'a pas pu être enregistrée."
+      );
+    } finally {
+      setSavingPreference(null);
+    }
+  };
 
   /**
    * Vérifie les autorisations et compte toutes les
@@ -75,6 +184,10 @@ export default function SettingsScreen() {
   useEffect(() => {
     void refreshNotificationStatus();
   }, [refreshNotificationStatus]);
+
+  useEffect(() => {
+    void loadNotificationPreferences();
+  }, [loadNotificationPreferences]);
 
   /**
    * Demande l'autorisation Android/iOS si elle n'est
@@ -367,6 +480,77 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
+            Notifications quotidiennes
+          </Text>
+
+          <Text style={styles.sectionDescription}>
+            Les rappels personnels restent toujours actifs.
+            Par défaut, Daya reste silencieux le matin et
+            envoie le bilan du soir uniquement après une
+            journée avec de l’activité.
+          </Text>
+
+          {preferencesLoading ? (
+            <View style={styles.preferenceLoading}>
+              <ActivityIndicator />
+            </View>
+          ) : (
+            <>
+              <View style={styles.preferenceRow}>
+                <View style={styles.preferenceText}>
+                  <Text style={styles.preferenceLabel}>
+                    Briefing du matin quotidien
+                  </Text>
+
+                  <Text style={styles.preferenceDescription}>
+                    Recevoir un message chaque matin à 8 h.
+                  </Text>
+                </View>
+
+                <Switch
+                  value={morningBriefEnabled}
+                  disabled={savingPreference !== null}
+                  onValueChange={(value) => {
+                    void updateNotificationPreference(
+                      'morning_brief_enabled',
+                      value
+                    );
+                  }}
+                />
+              </View>
+
+              <View style={styles.preferenceDivider} />
+
+              <View style={styles.preferenceRow}>
+                <View style={styles.preferenceText}>
+                  <Text style={styles.preferenceLabel}>
+                    Bilan du soir quotidien
+                  </Text>
+
+                  <Text style={styles.preferenceDescription}>
+                    Désactivé : seulement les jours où vous
+                    ajoutez une note ou un rappel. Activé :
+                    tous les soirs à 21 h.
+                  </Text>
+                </View>
+
+                <Switch
+                  value={eveningSummaryDaily}
+                  disabled={savingPreference !== null}
+                  onValueChange={(value) => {
+                    void updateNotificationPreference(
+                      'evening_summary_daily',
+                      value
+                    );
+                  }}
+                />
+              </View>
+            </>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
             Diagnostic des notifications
           </Text>
 
@@ -587,6 +771,42 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: '600',
     color: '#64748B',
+  },
+
+  preferenceLoading: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+
+  preferenceRow: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+
+  preferenceText: {
+    flex: 1,
+  },
+
+  preferenceLabel: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+
+  preferenceDescription: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  preferenceDivider: {
+    height: 1,
+    backgroundColor: '#E6ECF5',
+    marginTop: 18,
   },
 
   statusCard: {

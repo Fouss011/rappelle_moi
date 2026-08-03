@@ -1,6 +1,9 @@
 const supabase = require('../config/supabase');
 
-function getDateKey(date, timezone = 'Europe/Paris') {
+function getDateKey(
+  date,
+  timezone = 'Europe/Paris'
+) {
   return new Intl.DateTimeFormat('fr-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -9,137 +12,315 @@ function getDateKey(date, timezone = 'Europe/Paris') {
   }).format(date);
 }
 
-function belongsToLocalDay(isoDate, expectedDateKey, timezone) {
+function belongsToLocalDay(
+  isoDate,
+  expectedDateKey,
+  timezone
+) {
   if (!isoDate) {
     return false;
   }
 
   const date = new Date(isoDate);
 
-  if (Number.isNaN(date.getTime())) {
-    return false;
-  }
-
-  return getDateKey(date, timezone) === expectedDateKey;
+  return (
+    !Number.isNaN(date.getTime()) &&
+    getDateKey(date, timezone) ===
+      expectedDateKey
+  );
 }
 
-function formatReminder(reminder, timezone) {
-  const date = new Date(reminder.reminder_at_iso);
-  const label = reminder.title || reminder.text || 'Rappel';
+function pluralize(
+  count,
+  singular,
+  plural = `${singular}s`
+) {
+  return count === 1 ? singular : plural;
+}
 
-  const dateText = new Intl.DateTimeFormat('fr-FR', {
+function cleanReminderLabel(reminder) {
+  const title =
+    typeof reminder?.title === 'string'
+      ? reminder.title.trim()
+      : '';
+
+  const text =
+    typeof reminder?.text === 'string'
+      ? reminder.text.trim()
+      : '';
+
+  if (
+    title &&
+    text &&
+    title.toLowerCase() !== text.toLowerCase()
+  ) {
+    return `${title} — ${text}`;
+  }
+
+  return (
+    title ||
+    text ||
+    'Rappel à consulter dans Daya'
+  );
+}
+
+function formatReminderDate(
+  isoDate,
+  timezone
+) {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('fr-FR', {
     timeZone: timezone,
+    weekday: 'short',
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date);
-
-  return `${label} — ${dateText}`;
+    hourCycle: 'h23',
+  })
+    .format(date)
+    .replace(',', ' à');
 }
 
-function generateSummary({ todayNotes, upcomingReminders, timezone }) {
-  const doneToday = todayNotes.filter((item) => item.is_done).length;
-  const createdToday = todayNotes.length;
+function getEveningEnding(dateKey) {
+  const endings = [
+    'Bonne soirée 🌙',
+    'Reposez-vous bien 😴',
+    'Prenez soin de vous 💙',
+    'À demain 👋',
+  ];
+
+  const dayNumber = Number(
+    dateKey.replaceAll('-', '')
+  );
+
+  return endings[
+    dayNumber % endings.length
+  ];
+}
+
+function buildReliableEveningSummary({
+  todayNoteCount,
+  todayReminderCount,
+  upcomingReminders,
+  timezone,
+  dateKey,
+}) {
+  const lines = [
+    'Bonsoir 👋 Aujourd’hui :',
+    `📝 ${todayNoteCount} ${pluralize(
+      todayNoteCount,
+      'note créée',
+      'notes créées'
+    )}`,
+    `⏰ ${todayReminderCount} ${pluralize(
+      todayReminderCount,
+      'rappel créé',
+      'rappels créés'
+    )}`,
+  ];
 
   if (upcomingReminders.length === 0) {
-    return `Bonsoir 👋 ${createdToday} élément(s) créé(s) aujourd’hui, dont ${doneToday} terminé(s). Aucun rappel à venir.`;
+    lines.push('📅 Aucun rappel à venir.');
+  } else {
+    const nextReminder =
+      upcomingReminders[0];
+
+    const nextLabel =
+      cleanReminderLabel(nextReminder);
+
+    const nextDate =
+      formatReminderDate(
+        nextReminder.reminder_at_iso,
+        timezone
+      );
+
+    lines.push(
+      `📅 ${upcomingReminders.length} ${pluralize(
+        upcomingReminders.length,
+        'rappel reste',
+        'rappels restent'
+      )} à venir.`
+    );
+
+    lines.push(
+      nextDate
+        ? `Prochain : ${nextLabel} — ${nextDate}.`
+        : `Prochain : ${nextLabel}.`
+    );
   }
 
-  const displayed = upcomingReminders.slice(0, 3);
-  const details = displayed
-    .map((item) => formatReminder(item, timezone))
-    .join(' • ');
+  lines.push(getEveningEnding(dateKey));
 
-  const remaining = upcomingReminders.length - displayed.length;
-  const suffix = remaining > 0 ? ` • Et ${remaining} autre(s).` : '';
-
-  return `Bonsoir 👋 ${createdToday} élément(s) créé(s) aujourd’hui, dont ${doneToday} terminé(s). ${upcomingReminders.length} rappel(s) à venir : ${details}${suffix}`.slice(0, 500);
+  return lines.join('\n');
 }
 
 async function generateAndSaveDailySummary(
   userId,
-  timezone = 'Europe/Paris'
+  timezone = 'Europe/Paris',
+  options = {}
 ) {
   if (!userId) {
-    throw new Error('userId manquant pour le résumé quotidien.');
+    throw new Error(
+      'userId manquant pour le résumé quotidien.'
+    );
   }
 
-  const todayKey = getDateKey(new Date(), timezone);
+  const forceDaily =
+    options.forceDaily === true;
 
-  const { data: recentNotes, error } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at_iso', { ascending: false })
-    .limit(200);
+  const todayKey =
+    getDateKey(new Date(), timezone);
+
+  const { data: recentNotes, error } =
+    await supabase
+      .from('notes')
+      .select(`
+        id,
+        user_id,
+        title,
+        text,
+        type,
+        created_at_iso,
+        reminder_at_iso,
+        is_done,
+        is_important
+      `)
+      .eq('user_id', userId)
+      .order('created_at_iso', {
+        ascending: false,
+      })
+      .limit(500);
 
   if (error) {
     throw new Error(error.message);
   }
 
   const notes = recentNotes ?? [];
-  const now = Date.now();
 
-  const todayNotes = notes.filter((item) =>
-    belongsToLocalDay(item.created_at_iso, todayKey, timezone)
+  const todayItems = notes.filter((item) =>
+    belongsToLocalDay(
+      item.created_at_iso,
+      todayKey,
+      timezone
+    )
   );
+
+  const todayRegularNotes =
+    todayItems.filter(
+      (item) => item.type !== 'reminder'
+    );
+
+  const todayReminders =
+    todayItems.filter(
+      (item) => item.type === 'reminder'
+    );
+
+  /*
+   * Règle produit :
+   * par défaut, aucun bilan si l'utilisateur
+   * n'a créé ni note ni rappel aujourd'hui.
+   *
+   * Un ancien rappel prévu dans quelques jours
+   * ne déclenche donc pas un bilan chaque soir.
+   */
+  const hasActivityToday =
+    todayRegularNotes.length > 0 ||
+    todayReminders.length > 0;
+
+  if (!hasActivityToday && !forceDaily) {
+    return null;
+  }
+
+  const now = Date.now();
 
   const upcomingReminders = notes
     .filter((item) => {
       if (
-        item.is_done ||
         item.type !== 'reminder' ||
+        item.is_done ||
         !item.reminder_at_iso
       ) {
         return false;
       }
 
-      const reminderTime = new Date(item.reminder_at_iso).getTime();
+      const reminderTime =
+        new Date(
+          item.reminder_at_iso
+        ).getTime();
 
-      return !Number.isNaN(reminderTime) && reminderTime > now;
+      return (
+        !Number.isNaN(reminderTime) &&
+        reminderTime > now
+      );
     })
-    .sort(
-      (a, b) =>
-        new Date(a.reminder_at_iso).getTime() -
-        new Date(b.reminder_at_iso).getTime()
-    );
+    .sort((a, b) => {
+      return (
+        new Date(
+          a.reminder_at_iso
+        ).getTime() -
+        new Date(
+          b.reminder_at_iso
+        ).getTime()
+      );
+    });
 
-  const summary = generateSummary({
-    todayNotes,
-    upcomingReminders,
-    timezone,
-  });
+  const summary =
+    buildReliableEveningSummary({
+      todayNoteCount:
+        todayRegularNotes.length,
+      todayReminderCount:
+        todayReminders.length,
+      upcomingReminders,
+      timezone,
+      dateKey: todayKey,
+    });
 
-  const summaryId = `${userId}-${todayKey}`;
+  const summaryId =
+    `${userId}-${todayKey}`;
 
-  const { error: summaryError } = await supabase
-    .from('daily_summaries')
-    .upsert(
-      {
-        id: summaryId,
-        user_id: userId,
-        summary_date: todayKey,
-        summary_text: summary,
-        total_notes: todayNotes.length,
-        important_count: todayNotes.filter((item) => item.is_important)
-          .length,
-        reminder_count: upcomingReminders.length,
-        done_count: todayNotes.filter((item) => item.is_done).length,
-      },
-      {
-        onConflict: 'id',
-      }
-    );
+  const { error: summaryError } =
+    await supabase
+      .from('daily_summaries')
+      .upsert(
+        {
+          id: summaryId,
+          user_id: userId,
+          summary_date: todayKey,
+          summary_text: summary,
+          total_notes:
+            todayRegularNotes.length,
+          important_count:
+            todayItems.filter(
+              (item) => item.is_important
+            ).length,
+          reminder_count:
+            todayReminders.length,
+          done_count:
+            todayItems.filter(
+              (item) => item.is_done
+            ).length,
+        },
+        {
+          onConflict: 'id',
+        }
+      );
 
   if (summaryError) {
-    throw new Error(summaryError.message);
+    throw new Error(
+      summaryError.message
+    );
   }
 
   return summary;
 }
 
 module.exports = {
-  generateSummary,
+  buildReliableEveningSummary,
   generateAndSaveDailySummary,
 };

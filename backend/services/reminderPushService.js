@@ -54,7 +54,7 @@ function buildReminderBody(note) {
     return `N’oublie pas : ${mainText}. C’est maintenant.`;
   }
 
-  return `Deuxième rappel Daya : ${mainText}`;
+  return `À ne pas oublier : ${mainText}`;
 }
 
 async function recoverStaleClaims() {
