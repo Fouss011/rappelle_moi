@@ -176,17 +176,27 @@ function detectReminderTime(text: string): DetectedReminder | null {
 
   return {
     reminderDate,
-    notifyDate: resolveNotifyDate(reminderDate),
+    notifyDate: resolveBackendNotifyDate(reminderDate),
   };
 }
 
-function resolveNotifyDate(reminderDate: Date) {
-  const now = Date.now();
+function resolveLocalNotifyDate(reminderDate: Date) {
   const tenMinutesBefore =
     reminderDate.getTime() - 10 * 60 * 1000;
 
-  if (tenMinutesBefore > now) {
+  if (tenMinutesBefore > Date.now()) {
     return new Date(tenMinutesBefore);
+  }
+
+  return new Date(reminderDate);
+}
+
+function resolveBackendNotifyDate(reminderDate: Date) {
+  const fiveMinutesBefore =
+    reminderDate.getTime() - 5 * 60 * 1000;
+
+  if (fiveMinutesBefore > Date.now()) {
+    return new Date(fiveMinutesBefore);
   }
 
   return new Date(reminderDate);
@@ -197,6 +207,81 @@ function isValidFutureDate(date: Date) {
     !Number.isNaN(date.getTime()) &&
     date.getTime() > Date.now()
   );
+}
+
+
+async function scheduleLocalPersonalReminder({
+  noteId,
+  title,
+  text,
+  reminderDate,
+}: {
+  noteId: string;
+  title: string;
+  text: string;
+  reminderDate: Date;
+}) {
+  if (Platform.OS === 'web') {
+    return undefined;
+  }
+
+  const currentPermissions =
+    await Notifications.getPermissionsAsync();
+
+  let granted =
+    currentPermissions.granted ||
+    currentPermissions.status === 'granted';
+
+  if (!granted) {
+    const requestedPermissions =
+      await Notifications.requestPermissionsAsync();
+
+    granted =
+      requestedPermissions.granted ||
+      requestedPermissions.status === 'granted';
+  }
+
+  if (!granted) {
+    console.warn(
+      'Notification locale non programmée : autorisation refusée.'
+    );
+
+    return undefined;
+  }
+
+  const localNotifyDate =
+    resolveLocalNotifyDate(reminderDate);
+
+  if (localNotifyDate.getTime() <= Date.now()) {
+    return undefined;
+  }
+
+  const notificationId =
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Daya — Premier rappel',
+        body: text,
+        sound: 'default',
+        data: {
+          kind: 'personal_reminder_local_v2',
+          noteId,
+          reminderAtIso: reminderDate.toISOString(),
+          notifyAtIso: localNotifyDate.toISOString(),
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: localNotifyDate,
+        channelId: 'daya-reminders-v1',
+      },
+    });
+
+  console.log(
+    `Rappel local programmé pour ${localNotifyDate.toISOString()} :`,
+    notificationId
+  );
+
+  return notificationId;
 }
 
 async function cancelLegacyPersonalReminderNotifications() {
@@ -615,7 +700,7 @@ if (aiHasTime) {
   if (isValidFutureDate(reminderDate)) {
     detected = {
       reminderDate,
-      notifyDate: resolveNotifyDate(reminderDate),
+      notifyDate: resolveBackendNotifyDate(reminderDate),
     };
   }
 } else if (
@@ -636,7 +721,7 @@ if (aiHasTime) {
     detected = {
       reminderDate: smartReminder,
       notifyDate:
-        resolveNotifyDate(smartReminder),
+        resolveBackendNotifyDate(smartReminder),
     };
   }
 } else {
@@ -644,19 +729,45 @@ if (aiHasTime) {
 }
 
 /**
- * Le rappel personnel est désormais envoyé
- * par le backend via Expo Push Token.
+ * Double protection pour les rappels personnels :
+ * - notification locale à H - 10 minutes ;
+ * - notification backend à H - 5 minutes.
  *
- * Le frontend calcule et enregistre seulement
- * l'heure à laquelle le backend doit l'envoyer.
+ * Les briefings de 8 h et 21 h restent gérés uniquement
+ * par le backend.
  */
-const finalNotifyDate =
+const backendNotifyDate =
   detected?.notifyDate;
 
 const now = new Date();
+const newNoteId = generateNoteId();
+
+let localNotificationId:
+  | string
+  | undefined;
+
+if (detected) {
+  try {
+    localNotificationId =
+      await scheduleLocalPersonalReminder({
+        noteId: newNoteId,
+        title: normalizeGeneratedTitle(
+          aiAnalysis?.title,
+          cleanText
+        ),
+        text: cleanText,
+        reminderDate: detected.reminderDate,
+      });
+  } catch (error) {
+    console.warn(
+      'Le rappel local n’a pas pu être programmé. Le backend reste actif :',
+      error
+    );
+  }
+}
 
       const newNote: Note = {
-        id: generateNoteId(),
+        id: newNoteId,
 
         title: normalizeGeneratedTitle(
           aiAnalysis?.title,
@@ -691,8 +802,8 @@ const now = new Date();
             )
           : undefined,
 
-        notifyAt: finalNotifyDate
-          ? finalNotifyDate.toLocaleTimeString(
+        notifyAt: backendNotifyDate
+          ? backendNotifyDate.toLocaleTimeString(
               'fr-FR',
               {
                 hour: '2-digit',
@@ -705,9 +816,9 @@ const now = new Date();
           detected?.reminderDate.toISOString(),
 
         notifyAtIso:
-          finalNotifyDate?.toISOString(),
+          backendNotifyDate?.toISOString(),
 
-        notificationId: undefined,
+        notificationId: localNotificationId,
 
         isImportant: false,
         isDone: false,
@@ -721,10 +832,28 @@ const now = new Date();
       const saved =
         await saveNoteToSupabase(newNote);
 
-      if (saved) {
-        refreshMemoryInBackground();
+      if (!saved) {
+        setNotes((currentNotes) =>
+          currentNotes.filter(
+            (item) => item.id !== newNote.id
+          )
+        );
+
+        if (
+          Platform.OS !== 'web' &&
+          localNotificationId
+        ) {
+          await Notifications.cancelScheduledNotificationAsync(
+            localNotificationId
+          );
+        }
+
+        throw new Error(
+          'La note n’a pas pu être enregistrée dans Supabase.'
+        );
       }
 
+      refreshMemoryInBackground();
       setNote('');
     } catch (error) {
       console.error(
@@ -817,6 +946,9 @@ const now = new Date();
         )
       );
 
+      let updatedNotificationId =
+        currentNote.notificationId;
+
       if (
         newValue &&
         Platform.OS !== 'web' &&
@@ -826,18 +958,56 @@ const now = new Date();
           await Notifications.cancelScheduledNotificationAsync(
             currentNote.notificationId
           );
+
+          updatedNotificationId = undefined;
         } catch (error) {
           console.warn(
             "Impossible d'annuler la notification terminée :",
             error
           );
         }
+      } else if (
+        !newValue &&
+        currentNote.reminderAtIso &&
+        new Date(currentNote.reminderAtIso).getTime() >
+          Date.now()
+      ) {
+        try {
+          updatedNotificationId =
+            await scheduleLocalPersonalReminder({
+              noteId: currentNote.id,
+              title: currentNote.title,
+              text: currentNote.text,
+              reminderDate: new Date(
+                currentNote.reminderAtIso
+              ),
+            });
+        } catch (error) {
+          console.warn(
+            'Impossible de reprogrammer le rappel local :',
+            error
+          );
+        }
       }
+
+      setNotes((currentNotes) =>
+        currentNotes.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                notificationId:
+                  updatedNotificationId,
+              }
+            : item
+        )
+      );
 
       const { error } = await supabase
         .from('notes')
         .update({
           is_done: newValue,
+          notification_id:
+            updatedNotificationId ?? null,
         })
         .eq('id', id)
         .eq('user_id', user.id);

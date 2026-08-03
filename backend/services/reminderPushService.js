@@ -25,14 +25,36 @@ function buildReminderBody(note) {
       ? note.text.trim()
       : 'Tu as un rappel à consulter dans Daya.';
 
+  const mainText =
+    !title || title.toLowerCase() === text.toLowerCase()
+      ? text
+      : `${title} — ${text}`;
+
+  const reminderTime =
+    new Date(note.reminder_at_iso).getTime();
+
+  const minutesRemaining = Number.isNaN(reminderTime)
+    ? null
+    : Math.round(
+        (reminderTime - Date.now()) / 60000
+      );
+
   if (
-    !title ||
-    title.toLowerCase() === text.toLowerCase()
+    minutesRemaining !== null &&
+    minutesRemaining >= 3 &&
+    minutesRemaining <= 7
   ) {
-    return text;
+    return `N’oublie pas : ${mainText}. C’est dans 5 minutes.`;
   }
 
-  return `${title}\n${text}`;
+  if (
+    minutesRemaining !== null &&
+    minutesRemaining <= 2
+  ) {
+    return `N’oublie pas : ${mainText}. C’est maintenant.`;
+  }
+
+  return `Deuxième rappel Daya : ${mainText}`;
 }
 
 async function recoverStaleClaims() {
@@ -337,19 +359,19 @@ async function processDueReminders() {
       );
 
       if (!profile?.push_enabled) {
-  await markReminderIgnored(
-    note.id,
-    'Push désactivé pour cet utilisateur.'
-  );
+        await markReminderIgnored(
+          note.id,
+          'Push désactivé pour cet utilisateur.'
+        );
 
-  results.push({
-    noteId: note.id,
-    status: 'skipped',
-    reason: 'Push désactivé pour cet utilisateur.',
-  });
-
-  continue;
-}
+        results.push({
+          noteId: note.id,
+          status: 'skipped',
+          reason:
+            'Push désactivé pour cet utilisateur.',
+        });
+        continue;
+      }
 
       if (
         !isValidExpoPushToken(
