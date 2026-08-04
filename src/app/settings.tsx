@@ -189,6 +189,22 @@ export default function SettingsScreen() {
     void loadNotificationPreferences();
   }, [loadNotificationPreferences]);
 
+  const openDayaSystemSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch (error) {
+      console.error(
+        "Impossible d'ouvrir les paramètres de Daya :",
+        error
+      );
+
+      Alert.alert(
+        'Paramètres indisponibles',
+        'Ouvre manuellement Paramètres > Applications > Daya.'
+      );
+    }
+  };
+
   /**
    * Demande l'autorisation Android/iOS si elle n'est
    * pas encore accordée.
@@ -549,6 +565,45 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {Platform.OS === 'android' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Fiabilité des rappels
+            </Text>
+
+            <View style={styles.backgroundAdvice}>
+              <Text style={styles.backgroundAdviceIcon}>
+                🔋
+              </Text>
+
+              <View style={styles.backgroundAdviceText}>
+                <Text style={styles.backgroundAdviceTitle}>
+                  Autorisez Daya en arrière-plan
+                </Text>
+
+                <Text style={styles.backgroundAdviceDescription}>
+                  Pour éviter les rappels manqués, ouvrez les
+                  paramètres de Daya puis choisissez une utilisation
+                  de la batterie « Sans restriction » ou autorisez
+                  l’activité en arrière-plan.
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                void openDayaSystemSettings();
+              }}
+            >
+              <Text style={styles.secondaryButtonText}>
+                Ouvrir les paramètres de Daya
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             Diagnostic des notifications
@@ -807,6 +862,40 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E6ECF5',
     marginTop: 18,
+  },
+
+  backgroundAdvice: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+
+  backgroundAdviceIcon: {
+    fontSize: 22,
+  },
+
+  backgroundAdviceText: {
+    flex: 1,
+  },
+
+  backgroundAdviceTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#9A3412',
+  },
+
+  backgroundAdviceDescription: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+    color: '#7C2D12',
   },
 
   statusCard: {

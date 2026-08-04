@@ -259,7 +259,7 @@ async function scheduleLocalPersonalReminder({
   const notificationId =
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Daya — Premier rappel',
+        title: 'Daya',
         body: text,
         sound: 'default',
         data: {

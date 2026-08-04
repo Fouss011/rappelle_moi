@@ -60,15 +60,13 @@ export function NextReminderCard({
   reminders,
   onSeeAll,
 }: NextReminderCardProps) {
-  const nextReminders = reminders.slice(0, 3);
-
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View>
           <Text style={styles.smallTitle}>Prochains rappels</Text>
           <Text style={styles.subtitle}>
-            Tes 3 prochaines échéances.
+            Tous tes rappels à venir.
           </Text>
         </View>
 
@@ -77,7 +75,7 @@ export function NextReminderCard({
         </TouchableOpacity>
       </View>
 
-      {nextReminders.length === 0 ? (
+      {reminders.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>Rien de prévu</Text>
 
@@ -86,12 +84,12 @@ export function NextReminderCard({
           </Text>
         </View>
       ) : (
-        nextReminders.map((item, index) => (
+        reminders.map((item, index) => (
           <View
             key={item.id}
             style={[
               styles.item,
-              index === nextReminders.length - 1 && styles.lastItem,
+              index === reminders.length - 1 && styles.lastItem,
             ]}
           >
             <View style={styles.dateBox}>

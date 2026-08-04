@@ -35,6 +35,10 @@ export default function HomeScreen() {
     pendingNotes,
   } = useNotes();
 
+  const hasSavedContent =
+    pendingNotes.length > 0 ||
+    scheduledReminders.length > 0;
+
   /**
    * Redirige l’utilisateur vers la connexion uniquement
    * lorsque la restauration de session est terminée.
@@ -146,15 +150,42 @@ export default function HomeScreen() {
           loading={saving}
         />
 
+        {!hasSavedContent ? (
+          <View style={styles.emptyGuideCard}>
+            <Text style={styles.emptyGuideEmoji}>
+              💡
+            </Text>
+
+            <Text style={styles.emptyGuideTitle}>
+              Commencez simplement
+            </Text>
+
+            <Text style={styles.emptyGuideText}>
+              Notez une idée pour ne plus l’oublier, ou écrivez
+              un rappel avec une heure précise.
+            </Text>
+
+            <View style={styles.emptyGuideExample}>
+              <Text style={styles.emptyGuideExampleLabel}>
+                Exemple
+              </Text>
+
+              <Text style={styles.emptyGuideExampleText}>
+                « Rappelle-moi d’appeler Rachel demain à 18 h »
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <RecentNotesPreview
           notes={pendingNotes
             .filter((item) => item.type === 'note')
-            .slice(0, 2)}
+            .slice(0, 3)}
           onSeeAll={() => router.push('/notes')}
         />
 
         <NextReminderCard
-          reminders={scheduledReminders.slice(0, 3)}
+          reminders={scheduledReminders}
           onSeeAll={() => router.push('/reminders')}
         />
       </ScrollView>
@@ -231,6 +262,64 @@ content: {
   paddingTop: 90,
   paddingBottom: 110,
 },
+
+  emptyGuideCard: {
+    marginTop: 16,
+    marginBottom: 4,
+    alignItems: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+  },
+
+  emptyGuideEmoji: {
+    fontSize: 28,
+  },
+
+  emptyGuideTitle: {
+    marginTop: 10,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+
+  emptyGuideText: {
+    marginTop: 8,
+    maxWidth: 310,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  emptyGuideExample: {
+    width: '100%',
+    marginTop: 16,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#F8FAFC',
+  },
+
+  emptyGuideExampleLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#94A3B8',
+  },
+
+  emptyGuideExampleText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    color: '#334155',
+  },
 
   loadingContainer: {
     flex: 1,

@@ -16,7 +16,7 @@ export function RecentNotesPreview({
   notes,
   onSeeAll,
 }: RecentNotesPreviewProps) {
-  const recentNotes = notes.slice(0, 2);
+  const recentNotes = notes.slice(0, 3);
 
   return (
     <View style={styles.card}>
@@ -24,7 +24,7 @@ export function RecentNotesPreview({
         <View>
           <Text style={styles.title}>Dernières notes</Text>
           <Text style={styles.subtitle}>
-            Tes 2 captures les plus récentes.
+            Tes 3 captures les plus récentes.
           </Text>
         </View>
 
