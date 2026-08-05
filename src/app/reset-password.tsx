@@ -18,11 +18,13 @@ export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] =
     useState('');
-
+  const [showPassword, setShowPassword] =
+    useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
   const [saving, setSaving] = useState(false);
   const [checkingSession, setCheckingSession] =
     useState(true);
-
   const [sessionAvailable, setSessionAvailable] =
     useState(false);
 
@@ -36,16 +38,13 @@ export default function ResetPasswordScreen() {
           error,
         } = await supabase.auth.getSession();
 
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
         if (error) {
           console.error(
             'Erreur de vérification de la session :',
             error.message
           );
-
           setSessionAvailable(false);
           return;
         }
@@ -56,14 +55,9 @@ export default function ResetPasswordScreen() {
           'Erreur inattendue pendant la vérification de la session :',
           error
         );
-
-        if (mounted) {
-          setSessionAvailable(false);
-        }
+        if (mounted) setSessionAvailable(false);
       } finally {
-        if (mounted) {
-          setCheckingSession(false);
-        }
+        if (mounted) setCheckingSession(false);
       }
     }
 
@@ -73,9 +67,7 @@ export default function ResetPasswordScreen() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
         if (
           event === 'PASSWORD_RECOVERY' ||
@@ -94,16 +86,13 @@ export default function ResetPasswordScreen() {
   }, []);
 
   const submitNewPassword = async () => {
-    if (saving) {
-      return;
-    }
+    if (saving) return;
 
     if (!password || !confirmPassword) {
       Alert.alert(
         'Champs manquants',
         'Entre et confirme ton nouveau mot de passe.'
       );
-
       return;
     }
 
@@ -112,7 +101,6 @@ export default function ResetPasswordScreen() {
         'Mot de passe trop court',
         'Utilise au moins 8 caractères.'
       );
-
       return;
     }
 
@@ -121,7 +109,6 @@ export default function ResetPasswordScreen() {
         'Mots de passe différents',
         'Les deux mots de passe doivent être identiques.'
       );
-
       return;
     }
 
@@ -129,16 +116,13 @@ export default function ResetPasswordScreen() {
 
     try {
       const { error } =
-        await supabase.auth.updateUser({
-          password,
-        });
+        await supabase.auth.updateUser({ password });
 
       if (error) {
         Alert.alert(
           'Impossible de modifier le mot de passe',
           error.message
         );
-
         return;
       }
 
@@ -148,9 +132,7 @@ export default function ResetPasswordScreen() {
         [
           {
             text: 'Continuer',
-            onPress: () => {
-              router.replace('/');
-            },
+            onPress: () => router.replace('/'),
           },
         ]
       );
@@ -159,7 +141,6 @@ export default function ResetPasswordScreen() {
         'Erreur inattendue pendant la modification du mot de passe :',
         error
       );
-
       Alert.alert(
         'Erreur',
         'Impossible de modifier ton mot de passe pour le moment.'
@@ -170,45 +151,145 @@ export default function ResetPasswordScreen() {
   };
 
   if (checkingSession) {
-  return (
-    <AppBackground>
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-
-        <Text style={styles.loadingTitle}>
-          Vérification du lien…
-        </Text>
-
-        <Text style={styles.loadingText}>
-          Daya prépare la modification de ton mot de passe.
-        </Text>
-      </SafeAreaView>
-    </AppBackground>
-  );
-}
+    return (
+      <AppBackground>
+        <SafeAreaView style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.loadingTitle}>
+            Vérification du lien…
+          </Text>
+          <Text style={styles.loadingText}>
+            Daya prépare la modification de ton mot de passe.
+          </Text>
+        </SafeAreaView>
+      </AppBackground>
+    );
+  }
 
   if (!sessionAvailable) {
+    return (
+      <AppBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.card}>
+            <Text style={styles.icon}>🔐</Text>
+            <Text style={styles.title}>
+              Lien invalide ou expiré
+            </Text>
+            <Text style={styles.subtitle}>
+              Demande un nouveau lien depuis la page de
+              connexion.
+            </Text>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.replace('/login')}
+            >
+              <Text style={styles.secondaryButtonText}>
+                Revenir à la connexion
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </AppBackground>
+    );
+  }
+
   return (
     <AppBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.card}>
           <Text style={styles.icon}>🔐</Text>
-
           <Text style={styles.title}>
-            Lien invalide ou expiré
+            Nouveau mot de passe
+          </Text>
+          <Text style={styles.subtitle}>
+            Choisis un nouveau mot de passe sécurisé pour
+            ton compte Daya.
           </Text>
 
-          <Text style={styles.subtitle}>
-            Demande un nouveau lien depuis la page de
-            connexion.
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Nouveau mot de passe"
+              placeholderTextColor="#94A3B8"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              editable={!saving}
+              autoComplete="new-password"
+              textContentType="newPassword"
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() =>
+                setShowPassword((current) => !current)
+              }
+              disabled={saving}
+            >
+              <Text style={styles.eyeText}>
+                {showPassword ? '🙈' : '👁️'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Confirmer le mot de passe"
+              placeholderTextColor="#94A3B8"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              editable={!saving}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() =>
+                void submitNewPassword()
+              }
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() =>
+                setShowConfirmPassword(
+                  (current) => !current
+                )
+              }
+              disabled={saving}
+            >
+              <Text style={styles.eyeText}>
+                {showConfirmPassword ? '🙈' : '👁️'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.passwordHint}>
+            Utilise au moins 8 caractères.
           </Text>
 
           <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => router.replace('/login')}
+            style={[
+              styles.button,
+              saving && styles.buttonDisabled,
+            ]}
+            onPress={() => void submitNewPassword()}
+            disabled={saving}
           >
-            <Text style={styles.secondaryButtonText}>
-              Revenir à la connexion
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>
+                Enregistrer le mot de passe
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.replace('/login')}
+            disabled={saving}
+          >
+            <Text style={styles.cancelButtonText}>
+              Annuler
             </Text>
           </TouchableOpacity>
         </View>
@@ -217,110 +298,26 @@ export default function ResetPasswordScreen() {
   );
 }
 
-  return (
-  <AppBackground>
-    <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.icon}>🔐</Text>
-
-        <Text style={styles.title}>
-          Nouveau mot de passe
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Choisis un nouveau mot de passe sécurisé pour
-          ton compte Daya.
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Nouveau mot de passe"
-          placeholderTextColor="#94A3B8"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!saving}
-          autoComplete="new-password"
-          textContentType="newPassword"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmer le mot de passe"
-          placeholderTextColor="#94A3B8"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          editable={!saving}
-          autoComplete="new-password"
-          textContentType="newPassword"
-          returnKeyType="done"
-          onSubmitEditing={() => {
-            void submitNewPassword();
-          }}
-        />
-
-        <Text style={styles.passwordHint}>
-          Utilise au moins 8 caractères.
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.button,
-            saving && styles.buttonDisabled,
-          ]}
-          onPress={() => {
-            void submitNewPassword();
-          }}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>
-              Enregistrer le mot de passe
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => router.replace('/login')}
-          disabled={saving}
-        >
-          <Text style={styles.cancelButtonText}>
-            Annuler
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  </AppBackground>
-);
-}
-
 const styles = StyleSheet.create({
   container: {
-  flex: 1,
-  justifyContent: 'center',
-  padding: 22,
-  backgroundColor: 'transparent',
-},
-
-loadingContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 24,
-  backgroundColor: 'transparent',
-},
-
+    flex: 1,
+    justifyContent: 'center',
+    padding: 22,
+    backgroundColor: 'transparent',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: 'transparent',
+  },
   loadingTitle: {
     marginTop: 18,
     fontSize: 20,
     fontWeight: '900',
     color: '#0F172A',
   },
-
   loadingText: {
     marginTop: 8,
     fontSize: 14,
@@ -328,26 +325,22 @@ loadingContainer: {
     textAlign: 'center',
     color: '#64748B',
   },
-
   card: {
     padding: 24,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: '#E6ECF5',
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
   },
-
   icon: {
     fontSize: 38,
     marginBottom: 14,
   },
-
   title: {
     fontSize: 28,
     fontWeight: '900',
     color: '#0F172A',
   },
-
   subtitle: {
     marginTop: 8,
     marginBottom: 22,
@@ -356,20 +349,34 @@ loadingContainer: {
     fontWeight: '600',
     color: '#64748B',
   },
-
-  input: {
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E6ECF5',
-    backgroundColor: 'transparent',
+    backgroundColor: '#F8FBFF',
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 14,
     color: '#0F172A',
     fontSize: 15,
     fontWeight: '700',
   },
-
+  eyeButton: {
+    minWidth: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  eyeText: {
+    fontSize: 18,
+  },
   passwordHint: {
     marginTop: -2,
     marginBottom: 16,
@@ -378,46 +385,39 @@ loadingContainer: {
     fontWeight: '600',
     color: '#64748B',
   },
-
   button: {
     height: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: 'transparent',
+    backgroundColor: '#2563EB',
   },
-
   buttonDisabled: {
     opacity: 0.65,
   },
-
   buttonText: {
     fontSize: 15,
     fontWeight: '900',
     color: '#FFFFFF',
   },
-
   cancelButton: {
     marginTop: 14,
     alignItems: 'center',
     paddingVertical: 8,
   },
-
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '800',
     color: '#64748B',
   },
-
   secondaryButton: {
     height: 52,
     marginTop: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: 'transparent',
+    backgroundColor: '#EFF6FF',
   },
-
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '900',

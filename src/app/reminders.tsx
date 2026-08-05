@@ -198,13 +198,7 @@ export default function RemindersScreen() {
       style={styles.container}
       edges={['top', 'left', 'right']}
     >
-      <View style={styles.fixedHeader}>
-
-      </View>
-
-
       <ScrollView
-        style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -327,22 +321,8 @@ const styles = StyleSheet.create({
   backgroundColor: 'transparent',
 },
 
-  fixedHeader: {
-    paddingHorizontal: 22,
-    paddingTop: 8,
-    paddingBottom: 10,
-    backgroundColor: 'transparent',
-    zIndex: 20,
-    elevation: 20,
-  },
-
-  scrollView: {
-    flex: 1,
-  },
-
   content: {
-    paddingHorizontal: 22,
-    paddingTop: 8,
+    padding: 22,
     paddingBottom: 50,
   },
 
@@ -354,6 +334,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#E6ECF5',
+    marginBottom: 18,
   },
 
   backText: {
