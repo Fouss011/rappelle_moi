@@ -112,17 +112,6 @@ async function askMemory(question, userId) {
     throw new Error('Utilisateur non identifié.');
   }
 
-  /**
-   * Un message social court est traité directement.
-   *
-   * Exemples :
-   * "Bonjour" → salutation
-   * "Merci" → conclusion
-   *
-   * Mais :
-   * "Ai-je une note avec bonjour ?" → recherche
-   * "Bonjour, ai-je parlé de Rachel ?" → recherche
-   */
   if (isSimpleGreeting(cleanQuestion)) {
     return getGreetingResponse(cleanQuestion);
   }
@@ -133,7 +122,16 @@ async function askMemory(question, userId) {
 
   const { data: notes, error } = await supabase
     .from('notes')
-    .select('*')
+    .select(`
+      id,
+      title,
+      text,
+      type,
+      created_at_iso,
+      reminder_at_iso,
+      is_done,
+      is_important
+    `)
     .eq('user_id', userId)
     .order('created_at_iso', {
       ascending: false,
@@ -151,6 +149,22 @@ async function askMemory(question, userId) {
     );
   }
 
+  const memoryItems = notes.map((note) => ({
+    title:
+      typeof note.title === 'string'
+        ? note.title.trim()
+        : '',
+    text:
+      typeof note.text === 'string'
+        ? note.text.trim()
+        : '',
+    type: note.type,
+    createdAt: note.created_at_iso,
+    reminderAt: note.reminder_at_iso,
+    done: Boolean(note.is_done),
+    important: Boolean(note.is_important),
+  }));
+
   const response =
     await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -162,11 +176,16 @@ async function askMemory(question, userId) {
           content:
             "Tu es Daya, l'agent mémoire personnel de l'utilisateur. " +
             "Tu réponds uniquement à partir des notes fournies. " +
-            "Si l'information n'apparaît pas dans les notes, dis-le clairement. " +
+            "Les éléments fournis correspondent aux notes et rappels enregistrés dans l'application Daya. " +
+            "Quand l'utilisateur demande s'il possède une note, une idée, un rappel ou une information 'dans Daya', " +
+            "il parle généralement de ce qui est enregistré dans l'application, et non d'un sujet intitulé Daya. " +
+            "Ne considère Daya comme le sujet recherché que si l'utilisateur demande explicitement une note 'à propos de Daya' ou 'sur le projet Daya'. " +
+            "Pour une question générale comme 'Ai-je des notes ?', 'Qu'ai-je enregistré ?' ou 'As-tu une idée dans Daya ?', " +
+            "confirme l'existence des éléments et présente quelques exemples pertinents. " +
+            "Utilise principalement les champs title et text. " +
+            "Le champ type indique s'il s'agit d'une note ou d'un rappel. " +
+            "Si l'information demandée n'apparaît réellement pas dans les éléments fournis, dis-le clairement. " +
             "N'invente jamais de fait, de date ou de décision. " +
-            "Tu dois distinguer une simple salutation d'une recherche contenant le mot bonjour. " +
-            "Tu dois distinguer un simple remerciement d'une phrase qui contient aussi une question. " +
-            "Lorsqu'une vraie question est posée, réponds à la question sans te laisser distraire par les formules de politesse. " +
             "Réponds en français de manière claire, chaleureuse et concise.",
         },
         {
@@ -176,10 +195,10 @@ Question de l'utilisateur :
 
 ${cleanQuestion}
 
-Notes personnelles de l'utilisateur :
+Éléments enregistrés dans Daya :
 
-${JSON.stringify(notes, null, 2)}
-`,
+${JSON.stringify(memoryItems, null, 2)}
+          `.trim(),
         },
       ],
     });
