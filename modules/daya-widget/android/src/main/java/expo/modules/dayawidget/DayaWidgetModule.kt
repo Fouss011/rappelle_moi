@@ -2,6 +2,7 @@ package expo.modules.dayawidget
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
