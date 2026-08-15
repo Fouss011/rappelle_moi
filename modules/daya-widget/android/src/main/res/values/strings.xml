@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="daya_widget_name">Daya</string>
+    <string name="daya_widget_description">Voir votre prochain rappel Daya</string>
+</resources>

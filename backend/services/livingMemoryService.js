@@ -2,7 +2,7 @@ const openai = require('../config/openai');
 const supabase = require('../config/supabase');
 
 const MAX_ITEMS_PER_SECTION = 8;
-const ANALYSIS_VERSION = 2;
+const ANALYSIS_VERSION = 3;
 
 function normalizeArray(value, maxItems = MAX_ITEMS_PER_SECTION) {
   return Array.isArray(value)
@@ -35,7 +35,7 @@ function calculateFallbackConfidence(evidenceCount) {
     return 0.55;
   }
 
-  return 0.35;
+  return 0;
 }
 
 function normalizeLabel(value) {
@@ -106,6 +106,18 @@ function normalizeMemoryItem(item, allowedNoteIds) {
     allowedNoteIds
   );
 
+  /**
+   * RÈGLE DE SÉCURITÉ IMPORTANTE
+   *
+   * Aucun projet, objectif, sujet, personne,
+   * préférence ou open loop ne peut exister
+   * dans la mémoire vivante sans preuve issue
+   * des vraies notes de CET utilisateur.
+   */
+  if (evidenceNoteIds.length === 0) {
+    return null;
+  }
+
   const providedConfidence =
     clampConfidence(item.confidence);
 
@@ -142,16 +154,13 @@ function normalizeMemoryItems(
     )
     .filter(Boolean);
 
-  /**
-   * Évite les doublons dans une même rubrique.
-   * Exemple : "Daya" et "daya".
-   */
   const uniqueItems = new Map();
 
   for (const item of normalizedItems) {
     const key = item.label.toLowerCase();
 
-    const existingItem = uniqueItems.get(key);
+    const existingItem =
+      uniqueItems.get(key);
 
     if (!existingItem) {
       uniqueItems.set(key, item);
@@ -182,7 +191,8 @@ function normalizeMemoryItems(
         )
       ),
 
-      evidenceNoteIds: mergedEvidenceIds,
+      evidenceNoteIds:
+        mergedEvidenceIds,
 
       lastSeenAt:
         getMostRecentDate(
@@ -192,14 +202,28 @@ function normalizeMemoryItems(
     });
   }
 
-  return Array.from(uniqueItems.values())
+  return Array.from(
+    uniqueItems.values()
+  )
     .sort((a, b) => {
-      if (b.confidence !== a.confidence) {
-        return b.confidence - a.confidence;
+      if (
+        b.confidence !==
+        a.confidence
+      ) {
+        return (
+          b.confidence -
+          a.confidence
+        );
       }
 
-      return getDateTimestamp(b.lastSeenAt) -
-        getDateTimestamp(a.lastSeenAt);
+      return (
+        getDateTimestamp(
+          b.lastSeenAt
+        ) -
+        getDateTimestamp(
+          a.lastSeenAt
+        )
+      );
     })
     .slice(0, maxItems);
 }
@@ -209,14 +233,18 @@ function getDateTimestamp(value) {
     return 0;
   }
 
-  const timestamp = new Date(value).getTime();
+  const timestamp =
+    new Date(value).getTime();
 
   return Number.isNaN(timestamp)
     ? 0
     : timestamp;
 }
 
-function getMostRecentDate(firstValue, secondValue) {
+function getMostRecentDate(
+  firstValue,
+  secondValue
+) {
   const firstTimestamp =
     getDateTimestamp(firstValue);
 
@@ -230,7 +258,8 @@ function getMostRecentDate(firstValue, secondValue) {
     return null;
   }
 
-  return secondTimestamp > firstTimestamp
+  return secondTimestamp >
+    firstTimestamp
     ? secondValue
     : firstValue;
 }
@@ -263,7 +292,7 @@ function buildFallbackSummary({
 
   if (importantPeople.length > 0) {
     fragments.push(
-      `${importantPeople[0].label} apparaît dans les éléments personnels ou les actions récentes.`
+      `${importantPeople[0].label} apparaît régulièrement dans les souvenirs enregistrés.`
     );
   }
 
@@ -275,14 +304,14 @@ function buildFallbackSummary({
 
   if (openLoops.length > 0) {
     fragments.push(
-      `${openLoops.length} élément(s) semblent encore en attente de résolution.`
+      `${openLoops.length} élément(s) semblent encore demander une action ou une résolution.`
     );
   }
 
   if (fragments.length === 0) {
     return (
-      "Daya dispose de notes, mais n'a pas encore assez " +
-      "d'indices fiables pour produire un profil détaillé."
+      "Il n'y a pas encore assez d'éléments fiables " +
+      "dans les souvenirs enregistrés pour construire un profil détaillé."
     );
   }
 
@@ -296,11 +325,12 @@ async function getLivingMemory(userId) {
     );
   }
 
-  const { data, error } = await supabase
-    .from('user_memory_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data, error } =
+    await supabase
+      .from('user_memory_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
@@ -313,47 +343,55 @@ async function refreshLivingMemory(
   userId,
   options = {}
 ) {
-  const force = options.force === true;
+  const force =
+    options.force === true;
+
   if (!userId) {
     throw new Error(
       'Utilisateur non identifié pour la mémoire vivante.'
     );
   }
 
-  const { data: notes, error: notesError } =
-    await supabase
-      .from('notes')
-      .select(`
-        id,
-        title,
-        text,
-        created_at_iso,
-        type,
-        category,
-        reminder_at_iso,
-        is_important,
-        is_done
-      `)
-      .eq('user_id', userId)
-      .order('created_at_iso', {
-        ascending: false,
-      })
-      .limit(250);
+  const {
+    data: notes,
+    error: notesError,
+  } = await supabase
+    .from('notes')
+    .select(`
+      id,
+      title,
+      text,
+      created_at_iso,
+      type,
+      category,
+      reminder_at_iso,
+      is_important,
+      is_done
+    `)
+    .eq('user_id', userId)
+    .order('created_at_iso', {
+      ascending: false,
+    })
+    .limit(250);
 
   if (notesError) {
-    throw new Error(notesError.message);
+    throw new Error(
+      notesError.message
+    );
   }
 
-  const userNotes = notes ?? [];
+  const userNotes =
+    notes ?? [];
 
   if (userNotes.length === 0) {
-    const nowIso = new Date().toISOString();
+    const nowIso =
+      new Date().toISOString();
 
     const emptyProfile = {
       user_id: userId,
 
       personal_summary:
-        "Daya n'a pas encore assez de captures pour construire ce profil.",
+        "Il n'y a pas encore assez de souvenirs enregistrés pour construire une mémoire vivante.",
 
       active_projects: [],
       goals: [],
@@ -371,101 +409,136 @@ async function refreshLivingMemory(
       updated_at: nowIso,
     };
 
-    const { data, error } = await supabase
-      .from('user_memory_profiles')
-      .upsert(emptyProfile, {
-        onConflict: 'user_id',
-      })
+    const {
+      data,
+      error,
+    } = await supabase
+      .from(
+        'user_memory_profiles'
+      )
+      .upsert(
+        emptyProfile,
+        {
+          onConflict: 'user_id',
+        }
+      )
       .select()
       .single();
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        error.message
+      );
     }
 
     return data;
   }
 
   const existingProfile =
-  await getLivingMemory(userId);
+    await getLivingMemory(
+      userId
+    );
 
-const latestNoteDate =
-  userNotes[0]?.created_at_iso ?? null;
-
-/**
- * Si aucune nouvelle note n'a été ajoutée depuis
- * la dernière analyse, on renvoie directement
- * le profil existant sans rappeler OpenAI.
- */
-if (
-  !force &&
-  existingProfile &&
-  latestNoteDate &&
-  existingProfile.last_source_note_at
-) {
-  const latestNoteTimestamp =
-    new Date(latestNoteDate).getTime();
-
-  const lastAnalysedTimestamp =
-    new Date(
-      existingProfile.last_source_note_at
-    ).getTime();
-
-  if (
-    !Number.isNaN(latestNoteTimestamp) &&
-    !Number.isNaN(lastAnalysedTimestamp) &&
-    latestNoteTimestamp <= lastAnalysedTimestamp
-  ) {
-    return existingProfile;
-  }
-}
-
-const allowedNoteIds = new Set(
-  userNotes.map((note) => note.id)
-);
+  const latestNoteDate =
+    userNotes[0]
+      ?.created_at_iso ?? null;
 
   /**
-   * On envoie une version claire des notes à l'IA.
-   * Le titre intelligent l'aide à identifier rapidement
-   * le sujet central de chaque capture.
+   * Si la version du moteur a changé,
+   * on force automatiquement une nouvelle analyse,
+   * même sans nouvelle note.
    */
-  const preparedNotes = userNotes.map((note) => ({
-    id: note.id,
+  const profileUsesCurrentVersion =
+    existingProfile?.analysis_version ===
+    ANALYSIS_VERSION;
 
-    title:
-      typeof note.title === 'string'
-        ? note.title
-        : '',
+  if (
+    !force &&
+    profileUsesCurrentVersion &&
+    existingProfile &&
+    latestNoteDate &&
+    existingProfile
+      .last_source_note_at
+  ) {
+    const latestNoteTimestamp =
+      new Date(
+        latestNoteDate
+      ).getTime();
 
-    text:
-      typeof note.text === 'string'
-        ? note.text
-        : '',
+    const lastAnalysedTimestamp =
+      new Date(
+        existingProfile
+          .last_source_note_at
+      ).getTime();
 
-    createdAt:
-      note.created_at_iso ?? null,
+    if (
+      !Number.isNaN(
+        latestNoteTimestamp
+      ) &&
+      !Number.isNaN(
+        lastAnalysedTimestamp
+      ) &&
+      latestNoteTimestamp <=
+        lastAnalysedTimestamp
+    ) {
+      return existingProfile;
+    }
+  }
 
-    type:
-      note.type ?? 'note',
+  const allowedNoteIds =
+    new Set(
+      userNotes.map(
+        (note) => note.id
+      )
+    );
 
-    category:
-      note.category ?? 'autre',
+  const preparedNotes =
+    userNotes.map((note) => ({
+      id: note.id,
 
-    reminderAt:
-      note.reminder_at_iso ?? null,
+      title:
+        typeof note.title ===
+        'string'
+          ? note.title
+          : '',
 
-    important:
-      Boolean(note.is_important),
+      text:
+        typeof note.text ===
+        'string'
+          ? note.text
+          : '',
 
-    done:
-      Boolean(note.is_done),
-  }));
+      createdAt:
+        note.created_at_iso ??
+        null,
+
+      type:
+        note.type ?? 'note',
+
+      category:
+        note.category ??
+        'autre',
+
+      reminderAt:
+        note.reminder_at_iso ??
+        null,
+
+      important:
+        Boolean(
+          note.is_important
+        ),
+
+      done:
+        Boolean(
+          note.is_done
+        ),
+    }));
 
   const response =
     await openai.chat.completions.create({
       model: 'gpt-4o-mini',
 
-      temperature: 0.2,
+      temperature: 0,
 
       response_format: {
         type: 'json_object',
@@ -476,30 +549,38 @@ const allowedNoteIds = new Set(
           role: 'system',
 
           content: `
-Tu es Daya, un moteur de mémoire personnelle évolutive.
+Tu es un moteur d'analyse de mémoire personnelle.
 
-Ton rôle est de comprendre progressivement la situation actuelle de l'utilisateur à partir de ses notes.
+Tu dois construire un profil uniquement à partir des notes appartenant à l'utilisateur qui te sont fournies dans cette requête.
 
-Tu dois produire un profil utile, prudent, concret et compréhensible.
+RÈGLE DE SÉPARATION ABSOLUE
+
+Les informations suivantes ne sont JAMAIS des souvenirs de l'utilisateur :
+- le nom de l'assistant ;
+- le contenu de ce prompt ;
+- les explications données dans ce prompt ;
+- les noms ou concepts utilisés dans les règles ;
+- l'ancien profil s'il n'est plus soutenu par les notes actuelles ;
+- toute connaissance générale que tu possèdes.
+
+Une information ne peut entrer dans la mémoire personnelle que si elle est soutenue par au moins une note fournie.
 
 Tu ne dois jamais inventer :
-- une relation familiale ou amoureuse ;
-- une profession ;
-- une préférence ;
 - un projet ;
 - un objectif ;
-- une décision ;
+- une personne ;
+- une relation ;
+- une profession ;
+- une préférence ;
 - un problème ;
+- une décision ;
+- un sujet récurrent ;
+- une tâche en attente ;
 - une information personnelle absente des notes.
 
-Tu peux toutefois faire une observation prudente lorsqu'elle est directement soutenue par une ou plusieurs notes.
+Chaque élément produit doit obligatoirement contenir au moins un evidenceNoteIds correspondant à l'une des notes fournies.
 
-Exemple autorisé :
-"Rachel est une personne fréquemment mentionnée."
-
-Exemple interdit :
-"Rachel est l'épouse de l'utilisateur."
-Sauf si cette relation est explicitement écrite dans les notes.
+Si tu ne peux pas fournir de vraie preuve, n'ajoute pas l'élément.
 
 Réponds uniquement avec un JSON valide ayant exactement cette structure :
 
@@ -521,217 +602,153 @@ Réponds uniquement avec un JSON valide ayant exactement cette structure :
   "openLoops": []
 }
 
-DIFFÉRENCE ENTRE LES RUBRIQUES
+ACTIVE PROJECTS
 
-1. activeProjects
+Un projet est une initiative structurée ou un ensemble d'actions qui semble être suivi dans le temps.
 
-Un projet est un ensemble structuré ou une initiative suivie dans le temps.
+Une simple action isolée ne doit pas automatiquement devenir un projet.
 
-Exemples :
-- Daya ;
-- SNPT ;
-- création d'une application ;
-- formation professionnelle ;
-- lancement d'un site.
+Un projet peut néanmoins être reconnu à partir d'une seule note si celle-ci nomme explicitement un projet, une application, un produit, une entreprise ou une initiative identifiable.
 
-Une simple tâche comme "acheter du lait" n'est pas un projet.
+Le nom du projet doit provenir du contenu réel de la note.
 
-Lorsqu'une note mentionne une tâche liée à un projet connu, tu peux reconnaître le projet.
+N'invente jamais le nom d'un projet pour compléter une note vague.
 
-Exemple :
-"Réserver le domaine Daya"
-peut servir de preuve pour le projet "Daya".
-
-IMPORTANT
-
-Si une tâche mentionne clairement le nom d'un projet, d'une application,
-d'une entreprise, d'un logiciel ou d'un produit, tu dois créer le projet
-correspondant même si une seule note en parle.
-
-Exemples :
-
-"Réserver le domaine Daya"
-→ Projet : Daya
-
-"Finir la documentation SNPT"
-→ Projet : SNPT
-
-"Corriger le backend Fretlôme"
-→ Projet : Fretlôme
-
-"Préparer la présentation Moulédi"
-→ Projet : Moulédi
-
-Le projet représente le contexte global.
-
-La tâche représente une action.
-
-Les deux peuvent exister simultanément.
-
-Un projet peut donc être créé même si la note parle uniquement d'une tâche liée à ce projet.
-
-2. goals
+GOALS
 
 Un objectif représente un résultat que l'utilisateur souhaite atteindre.
 
-Exemples :
-- lancer Daya ;
-- terminer une formation ;
-- publier une application ;
-- finir une documentation ;
-- améliorer son organisation.
+Il doit être explicitement exprimé ou directement déductible d'une action formulée comme quelque chose à accomplir.
 
-Un objectif peut appartenir à un projet.
+Ne transforme pas une simple information en objectif.
 
-Un objectif peut être créé dès qu'une note exprime clairement un résultat à atteindre.
+IMPORTANT PEOPLE
 
-Exemples :
+Une personne peut être retenue lorsque :
+- son nom est explicitement présent dans les notes ;
+- elle apparaît plusieurs fois ;
+- ou une action importante enregistrée concerne cette personne.
 
-- Finir la documentation
-- Réserver le domaine
-- Corriger les notifications
-- Publier l'application
-- Déployer le backend
-- Terminer la formation
+Ne déduis jamais la nature de la relation si elle n'est pas explicitement écrite.
 
-Même avec une seule preuve claire, un objectif peut être conservé avec une confiance comprise entre 0.55 et 0.70.
+RECURRING TOPICS
 
-Un objectif est différent d'une tâche.
+Un sujet récurrent doit apparaître dans plusieurs souvenirs.
 
-Exemple :
+Un sujet mentionné une seule fois ne doit normalement pas être considéré comme récurrent.
 
-"Réserver le domaine Daya"
+Le fait qu'un mot soit présent dans ce prompt ne constitue jamais une preuve de récurrence.
 
-Projet :
-Daya
+PREFERENCES
 
-Objectif :
-Mettre en ligne Daya
+Une préférence doit être explicitement exprimée par l'utilisateur.
 
-Tâche en attente :
-Réserver le domaine
+Une action, une obligation ou un problème n'est pas automatiquement une préférence.
 
-3. importantPeople
+OPEN LOOPS
 
-Une personne peut être conservée lorsque :
-- son nom apparaît plusieurs fois ;
-- une action importante concerne cette personne ;
-- elle semble jouer un rôle récurrent.
+Un open loop est quelque chose qui semble encore nécessiter une action ou une résolution.
 
-Ne déduis jamais la nature exacte de la relation si elle n'est pas écrite.
+N'inclus pas une note terminée lorsque done vaut true.
 
-Une seule mention faible doit conduire à une confiance faible.
+Préfère une action précise plutôt qu'un projet entier.
 
-4. recurringTopics
+ANCIEN PROFIL
 
-Un sujet récurrent est un thème qui revient dans plusieurs notes.
+L'ancien profil est uniquement une aide historique.
 
-Exemples :
-- notifications ;
-- développement mobile ;
-- démarches administratives ;
-- Supabase ;
-- travail ;
-- formation.
+Il ne doit jamais être considéré comme une preuve.
 
-Ne mets pas un sujet dans cette rubrique s'il apparaît une seule fois, sauf s'il était déjà fortement présent dans l'ancien profil.
+Pour conserver un élément de l'ancien profil, tu dois retrouver au moins une preuve correspondante dans les notes actuelles fournies.
 
-5. preferences
+Si une information de l'ancien profil n'est plus soutenue par aucune note actuelle, supprime-la.
 
-Une préférence doit être explicitement indiquée.
+PERSONAL SUMMARY
 
-Exemples :
-- "Je préfère travailler le soir."
-- "Je n'aime pas les notifications bruyantes."
-- "Je veux une interface simple."
+Le résumé personnel doit être construit uniquement à partir des éléments réellement prouvés.
 
-Une action ou un problème ne constitue pas automatiquement une préférence.
-
-6. openLoops
-
-Un open loop est un élément qui semble encore demander une action ou une résolution.
-
-Exemples :
-- tâche non terminée ;
-- problème non résolu ;
-- décision à prendre ;
-- document à finir ;
-- personne à appeler ;
-- domaine à réserver.
-
-Règles pour openLoops :
-- n'inclus pas une note dont done vaut true ;
-- évite d'y mettre un projet entier si une action précise suffit ;
-- une note sans heure peut quand même être un open loop ;
-- une tâche terminée ne doit plus apparaître.
-
-RÈGLES SUR LE RÉSUMÉ PERSONNEL
-
-personalSummary doit :
-- contenir 2 à 4 phrases courtes ;
-- expliquer ce qui occupe l'utilisateur actuellement ;
-- mentionner en priorité les projets actifs, les objectifs principaux et les personnes les plus importantes lorsqu'ils existent ;
+Il doit :
+- contenir 1 à 4 phrases courtes ;
+- décrire ce qui ressort actuellement des souvenirs ;
 - rester prudent ;
-- ne jamais écrire "aucune information personnelle disponible" lorsque des notes existent ;
-- ne jamais inventer une identité ou une relation.
+- ne jamais ajouter une information provenant uniquement de l'ancien profil ou de ce prompt.
 
-RÈGLES SUR LA CONFIANCE
+S'il n'existe pas assez d'éléments fiables, indique simplement qu'il n'y a pas encore assez d'informations pour construire un profil détaillé.
 
-confidence doit être comprise entre 0 et 1.
+CONFIANCE
 
 Utilise approximativement :
 - 0.90 à 0.98 : information explicite et répétée ;
-- 0.75 à 0.89 : information explicite avec plusieurs preuves ;
-- 0.55 à 0.74 : information appuyée par une seule preuve claire ;
-- 0.35 à 0.54 : hypothèse prudente ou signal faible ;
-- en dessous de 0.35 : information trop faible, à éviter.
+- 0.75 à 0.89 : plusieurs preuves cohérentes ;
+- 0.55 à 0.74 : une seule preuve claire ;
+- 0.35 à 0.54 : signal faible.
 
-Ne mets pas systématiquement 0.5.
+Évite les éléments dont la confiance serait inférieure à 0.35.
 
-RÈGLES SUR LES PREUVES
+PREUVES
 
-- Chaque élément doit contenir au moins un evidenceNoteIds lorsque cela est possible.
-- Utilise uniquement les IDs présents dans les captures fournies.
-- lastSeenAt doit correspondre à la date de la preuve la plus récente.
-- Maximum 8 éléments par rubrique.
-- Écris uniquement en français.
-- Utilise des labels courts et clairs.
-- Évite les doublons.
-- Ne conserve pas une ancienne information si les nouvelles notes la contredisent clairement.
-          `,
+Chaque élément doit contenir au moins un evidenceNoteIds.
+
+Utilise uniquement les IDs présents dans les notes fournies.
+
+lastSeenAt doit correspondre à une date provenant des preuves utilisées.
+
+Maximum 8 éléments par rubrique.
+
+Écris uniquement en français.
+
+Utilise des labels courts et clairs.
+
+Évite les doublons.
+          `.trim(),
         },
 
         {
           role: 'user',
 
           content: `
-Voici l'ancien profil. Il sert uniquement de contexte historique :
+Voici l'ancien profil.
 
-${JSON.stringify(existingProfile ?? null, null, 2)}
+ATTENTION :
+Il n'est pas une source de vérité et n'est pas une preuve.
 
-Voici les notes actuelles de l'utilisateur :
+${JSON.stringify(
+  existingProfile ?? null,
+  null,
+  2
+)}
 
-${JSON.stringify(preparedNotes, null, 2)}
+Voici les seules notes autorisées comme preuves pour construire la mémoire personnelle de cet utilisateur :
 
-Construis maintenant le nouveau profil de mémoire vivante.
-          `,
+${JSON.stringify(
+  preparedNotes,
+  null,
+  2
+)}
+
+Construis maintenant le nouveau profil.
+
+Aucun élément ne doit être conservé s'il n'est pas soutenu par au moins une note ci-dessus.
+          `.trim(),
         },
       ],
     });
 
   const content =
-    response.choices?.[0]?.message?.content;
+    response.choices?.[0]
+      ?.message?.content;
 
   if (!content) {
     throw new Error(
-      "Daya n'a retourné aucun profil mémoire."
+      "Le moteur n'a retourné aucun profil mémoire."
     );
   }
 
   let parsed;
 
   try {
-    parsed = JSON.parse(content);
+    parsed =
+      JSON.parse(content);
   } catch (error) {
     console.error(
       'JSON mémoire invalide :',
@@ -739,7 +756,7 @@ Construis maintenant le nouveau profil de mémoire vivante.
     );
 
     throw new Error(
-      'Le profil mémoire retourné par Daya est invalide.'
+      'Le profil mémoire retourné est invalide.'
     );
   }
 
@@ -779,16 +796,16 @@ Construis maintenant le nouveau profil de mémoire vivante.
       allowedNoteIds
     );
 
-  const generatedSummary =
-    typeof parsed.personalSummary === 'string'
-      ? parsed.personalSummary
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 900)
-      : '';
-
+  /**
+   * IMPORTANT :
+   * on préfère générer nous-mêmes le résumé
+   * depuis les éléments déjà validés.
+   *
+   * Ainsi, même si l'IA écrit une information
+   * douteuse dans personalSummary, elle ne sera
+   * pas sauvegardée.
+   */
   const personalSummary =
-    generatedSummary ||
     buildFallbackSummary({
       activeProjects,
       goals,
@@ -797,7 +814,8 @@ Construis maintenant le nouveau profil de mémoire vivante.
       openLoops,
     });
 
-  const nowIso = new Date().toISOString();
+  const nowIso =
+    new Date().toISOString();
 
   const profileToSave = {
     user_id: userId,
@@ -834,16 +852,26 @@ Construis maintenant le nouveau profil de mémoire vivante.
       nowIso,
   };
 
-  const { data, error } = await supabase
-    .from('user_memory_profiles')
-    .upsert(profileToSave, {
-      onConflict: 'user_id',
-    })
+  const {
+    data,
+    error,
+  } = await supabase
+    .from(
+      'user_memory_profiles'
+    )
+    .upsert(
+      profileToSave,
+      {
+        onConflict: 'user_id',
+      }
+    )
     .select()
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(
+      error.message
+    );
   }
 
   return data;

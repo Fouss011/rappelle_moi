@@ -1,0 +1,44 @@
+buildscript {
+  repositories {
+    mavenCentral()
+    google()
+  }
+
+  dependencies {
+    classpath(
+      "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:${kotlinVersion}"
+    )
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+group = 'expo.modules.dayawidget'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.dayawidget"
+
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+
+  buildFeatures {
+    compose true
+  }
+
+  kotlinOptions {
+    jvmTarget = "1.8"
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation "androidx.glance:glance-appwidget:1.1.1"
+}

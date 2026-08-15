@@ -20,7 +20,10 @@ import { QuickCaptureCard } from '../components/QuickCaptureCard';
 import { RecentNotesPreview } from '../components/RecentNotesPreview';
 import { useAuth } from '../context/AuthContext';
 import { useNotes } from '../context/NotesContext';
-import { registerPushTokenForUser } from '../services/pushTokenService';
+import {
+  listenForPushTokenChanges,
+  registerPushTokenForUser,
+} from '../services/pushTokenService';
 
 export default function HomeScreen() {
   const { user, profile, loading, refreshProfile } = useAuth();
@@ -56,39 +59,87 @@ export default function HomeScreen() {
 
   const userId = user.id;
 
-  async function registerDevice() {
-    const result = await registerPushTokenForUser(userId);
+  let lastPushSyncAt = 0;
+  let syncRunning = false;
 
-    if (!result.success) {
-      console.warn(
-        "Le téléphone n'a pas été enregistré pour les push :",
-        result.error
-      );
-    }
-  }
-
-  void registerDevice();
-}, [user?.id]);
-
-  /**
-   * Recharge le prénom de l’utilisateur lorsque l’application
-   * revient au premier plan.
-   */
-  useEffect(() => {
-    if (!user) {
+  async function syncPushToken(force = false) {
+    if (syncRunning) {
       return;
     }
 
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void refreshProfile();
-      }
-    });
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
 
-    return () => {
-      subscription.remove();
-    };
-  }, [refreshProfile, user]);
+    if (
+      !force &&
+      now - lastPushSyncAt < fiveMinutes
+    ) {
+      return;
+    }
+
+    syncRunning = true;
+
+    try {
+      const result =
+        await registerPushTokenForUser(userId);
+
+      if (result.success) {
+        lastPushSyncAt = Date.now();
+
+        console.log(
+          '✅ Push Daya synchronisé.'
+        );
+      } else {
+        console.warn(
+          "Le push Daya n'a pas pu être synchronisé :",
+          result.error
+        );
+      }
+    } finally {
+      syncRunning = false;
+    }
+  }
+
+  /**
+   * Vérifie le token dès que la session
+   * utilisateur est disponible.
+   */
+  void syncPushToken(true);
+
+  /**
+   * Si Expo change le token pendant que
+   * l'application fonctionne, on le
+   * resynchronise automatiquement.
+   */
+  const pushTokenSubscription =
+    listenForPushTokenChanges(userId);
+
+  /**
+   * Quand Daya revient au premier plan,
+   * on recharge le profil et on vérifie
+   * de nouveau le token push.
+   */
+  const appStateSubscription =
+    AppState.addEventListener(
+      'change',
+      (state) => {
+        if (state !== 'active') {
+          return;
+        }
+
+        void refreshProfile();
+        void syncPushToken();
+      }
+    );
+
+  return () => {
+    pushTokenSubscription?.remove();
+    appStateSubscription.remove();
+  };
+}, [
+  user?.id,
+  refreshProfile,
+]);
 
 
   /**

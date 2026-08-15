@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["DayaWidgetModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.dayawidget.DayaWidgetModule"]
+  }
+}

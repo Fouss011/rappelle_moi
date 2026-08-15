@@ -1,13 +1,21 @@
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   onPress: () => void;
 };
 
 export function FloatingMemoryButton({ onPress }: Props) {
+  const insets = useSafeAreaInsets();
+
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[
+        styles.container,
+        {
+          bottom: insets.bottom + 22,
+        },
+      ]}
       activeOpacity={0.9}
       onPress={onPress}
     >
@@ -23,8 +31,6 @@ export function FloatingMemoryButton({ onPress }: Props) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-
-    bottom: 28,
 
     right: 22,
 

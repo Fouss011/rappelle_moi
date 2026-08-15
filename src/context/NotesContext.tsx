@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 
+import DayaWidgetModule from '../../modules/daya-widget/src/DayaWidgetModule';
 import { analyseNoteWithAI } from '../services/aiNoteService';
 import { refreshLivingMemory } from '../services/livingMemoryService';
 import { supabase } from '../services/supabase';
@@ -1108,6 +1109,48 @@ if (detected) {
         return dateA - dateB;
       });
   }, [notes]);
+
+  useEffect(() => {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  const syncWidget = async () => {
+    try {
+      const nextReminder = scheduledReminders[0];
+
+      if (!nextReminder?.reminderAtIso) {
+        await DayaWidgetModule.clearNextReminder();
+        return;
+      }
+
+      const reminderDate = new Date(
+        nextReminder.reminderAtIso
+      );
+
+      const formattedDate =
+        reminderDate.toLocaleString('fr-FR', {
+          weekday: 'short',
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+      await DayaWidgetModule.setNextReminder(
+        nextReminder.title || nextReminder.text,
+        formattedDate
+      );
+    } catch (error) {
+      console.error(
+        'Erreur synchronisation widget Daya :',
+        error
+      );
+    }
+  };
+
+  syncWidget();
+}, [scheduledReminders]);
 
   const pendingNotes = useMemo(() => {
     return notes

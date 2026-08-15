@@ -40,7 +40,6 @@ export function MemoryAssistantSheet({
   const scrollViewRef = useRef<ScrollView | null>(null);
   const insets = useSafeAreaInsets();
 
-  
   useEffect(() => {
     if (!visible) {
       Keyboard.dismiss();
@@ -180,7 +179,10 @@ export function MemoryAssistantSheet({
         style={[
           styles.sheet,
           {
-            paddingBottom: Math.max(insets.bottom, 14),
+            paddingBottom: Math.max(
+              insets.bottom + 8,
+              18
+            ),
           },
         ]}
       >
@@ -189,11 +191,11 @@ export function MemoryAssistantSheet({
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
             <Text style={styles.title}>
-  Ma mémoire
-</Text>
+              Ma mémoire
+            </Text>
 
             <Text style={styles.subtitle}>
-              Retrouve une idée, un rappel ou un souvenir enregistré.
+              Retrouve ce que tu as confié à Daya.
             </Text>
           </View>
 
@@ -208,16 +210,11 @@ export function MemoryAssistantSheet({
 
         <ScrollView
           ref={scrollViewRef}
-          style={[
-            styles.messagesBox,
-            messages.length === 0
-              ? styles.messagesBoxEmpty
-              : styles.messagesBoxFilled,
-          ]}
+          style={styles.conversation}
           contentContainerStyle={[
-            styles.messagesContent,
+            styles.conversationContent,
             messages.length === 0 &&
-              styles.emptyMessagesContent,
+              styles.conversationEmpty,
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -230,9 +227,19 @@ export function MemoryAssistantSheet({
           }}
         >
           {messages.length === 0 ? (
-            <Text style={styles.emptyText}>
-              Tes réponses apparaîtront ici.
-            </Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>
+                🧠
+              </Text>
+
+              <Text style={styles.emptyTitle}>
+                Demande quelque chose à ta mémoire
+              </Text>
+
+              <Text style={styles.emptySubtitle}>
+                Une idée, un rappel, un projet ou un souvenir.
+              </Text>
+            </View>
           ) : (
             messages.map((message, index) => (
               <View
@@ -257,12 +264,35 @@ export function MemoryAssistantSheet({
               </View>
             ))
           )}
+
+          {loading && (
+            <View
+              style={[
+                styles.messageBubble,
+                styles.assistantBubble,
+                styles.loadingBubble,
+              ]}
+            >
+              <ActivityIndicator
+                size="small"
+                color="#64748B"
+              />
+
+              <Text style={styles.loadingText}>
+                Daya cherche dans ta mémoire...
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.composer}>
           <TextInput
             style={styles.input}
-            placeholder="Pose ta question..."
+            placeholder={
+              messages.length === 0
+                ? 'Demande à ta mémoire...'
+                : 'Demande autre chose...'
+            }
             placeholderTextColor="#94A3B8"
             value={question}
             onChangeText={setQuestion}
@@ -276,9 +306,9 @@ export function MemoryAssistantSheet({
 
           <TouchableOpacity
             style={[
-              styles.askButton,
+              styles.sendButton,
               (!question.trim() || loading) &&
-                styles.askButtonDisabled,
+                styles.sendButtonDisabled,
             ]}
             onPress={() => {
               void askMemory();
@@ -287,19 +317,13 @@ export function MemoryAssistantSheet({
             activeOpacity={0.85}
           >
             {loading ? (
-              <View style={styles.loadingButtonContent}>
-                <ActivityIndicator
-                  size="small"
-                  color="#FFFFFF"
-                />
-
-                <Text style={styles.askButtonText}>
-                  Recherche...
-                </Text>
-              </View>
+              <ActivityIndicator
+                size="small"
+                color="#FFFFFF"
+              />
             ) : (
-              <Text style={styles.askButtonText}>
-                Envoyer
+              <Text style={styles.sendIcon}>
+                ➤
               </Text>
             )}
           </TouchableOpacity>
@@ -333,6 +357,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxHeight: '86%',
+    minHeight: '58%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
@@ -355,7 +380,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 14,
   },
 
   headerTextContainer: {
@@ -372,6 +397,7 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 3,
     fontSize: 13,
+    lineHeight: 19,
     fontWeight: '700',
     color: '#64748B',
   },
@@ -392,38 +418,57 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
 
-  messagesBox: {
+  conversation: {
     flexGrow: 0,
     flexShrink: 1,
-    backgroundColor: '#F8FBFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
+    minHeight: 220,
+    maxHeight: 390,
   },
 
-  messagesBoxEmpty: {
-    height: 58,
+  conversationContent: {
+    paddingVertical: 6,
+    paddingHorizontal: 2,
   },
 
-  messagesBoxFilled: {
-    minHeight: 90,
-    maxHeight: 260,
-  },
-
-  messagesContent: {
-    padding: 12,
-  },
-
-  emptyMessagesContent: {
+  conversationEmpty: {
     flexGrow: 1,
     justifyContent: 'center',
   },
 
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 34,
+  },
+
+  emptyIcon: {
+    fontSize: 30,
+    marginBottom: 12,
+  },
+
+  emptyTitle: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '900',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+
+  emptySubtitle: {
+    marginTop: 7,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+
   messageBubble: {
-    maxWidth: '90%',
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    borderRadius: 17,
+    maxWidth: '88%',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 18,
     marginBottom: 10,
   },
 
@@ -453,17 +498,33 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
 
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+
+  loadingText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+
   composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
     paddingTop: 12,
   },
 
   input: {
-    height: 52,
-    maxHeight: 86,
+    flex: 1,
+    minHeight: 54,
+    maxHeight: 100,
     backgroundColor: '#F8FBFF',
-    borderRadius: 17,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     fontSize: 15,
     lineHeight: 20,
     color: '#0F172A',
@@ -472,34 +533,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  askButton: {
-    height: 52,
-    borderRadius: 17,
+  sendButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 19,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
   },
 
-  askButtonDisabled: {
-    opacity: 0.48,
+  sendButtonDisabled: {
+    opacity: 0.4,
   },
 
-  loadingButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-
-  askButtonText: {
+  sendIcon: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 21,
     fontWeight: '900',
-  },
-
-  emptyText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#94A3B8',
+    marginLeft: 2,
   },
 });

@@ -16,7 +16,9 @@ function getProjectId(): string | null {
     Constants.default.easConfig?.projectId ??
     Constants.default.expoConfig?.extra?.eas?.projectId;
 
-  return typeof projectId === 'string' ? projectId : null;
+  return typeof projectId === 'string'
+    ? projectId
+    : null;
 }
 
 function getDeviceTimezone(): string {
@@ -30,41 +32,116 @@ function getDeviceTimezone(): string {
   }
 }
 
+async function savePushToken(
+  userId: string,
+  expoPushToken: string
+): Promise<RegisterPushTokenResult> {
+  const timezone = getDeviceTimezone();
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      expo_push_token: expoPushToken,
+      push_enabled: true,
+      timezone,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error(
+      "Erreur d'enregistrement du token push :",
+      error.message
+    );
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+
+  console.log(
+    '✅ Token push Daya synchronisé :',
+    expoPushToken
+  );
+
+  return {
+    success: true,
+    token: expoPushToken,
+  };
+}
+
 export async function registerPushTokenForUser(
   userId: string
 ): Promise<RegisterPushTokenResult> {
   if (Platform.OS === 'web') {
     return {
       success: false,
-      error: 'Les notifications push ne sont pas activées sur le web.',
+      error:
+        'Les notifications push ne sont pas activées sur le web.',
     };
   }
 
   if (!Device.isDevice) {
     return {
       success: false,
-      error: 'Un vrai téléphone est nécessaire pour obtenir un token push.',
+      error:
+        'Un vrai téléphone est nécessaire pour obtenir un token push.',
+    };
+  }
+
+  if (!userId) {
+    return {
+      success: false,
+      error: 'Utilisateur non identifié.',
     };
   }
 
   try {
     /**
-     * Le canal est normalement déjà créé dans _layout.tsx.
-     * On le recrée ici par sécurité : Android réutilisera
-     * simplement le canal existant.
+     * Les canaux utilisés réellement par le backend
+     * sont recréés ici par sécurité.
      */
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Daya',
-        description: 'Rappels et briefings intelligents de Daya',
-        importance: Notifications.AndroidImportance.MAX,
-        sound: 'default',
-        vibrationPattern: [0, 250, 250, 250],
-        enableVibrate: true,
-        enableLights: true,
-        lockscreenVisibility:
-          Notifications.AndroidNotificationVisibility.PUBLIC,
-      });
+      await Notifications.setNotificationChannelAsync(
+        'daya-reminders-v1',
+        {
+          name: 'Rappels Daya',
+          description:
+            'Rappels personnels avec son et vibration',
+          importance:
+            Notifications.AndroidImportance.MAX,
+          sound: 'default',
+          vibrationPattern: [0, 400, 200, 400],
+          enableVibrate: true,
+          enableLights: true,
+          lightColor: '#2563EB',
+          lockscreenVisibility:
+            Notifications
+              .AndroidNotificationVisibility
+              .PUBLIC,
+        }
+      );
+
+      await Notifications.setNotificationChannelAsync(
+        'daya-briefings-v1',
+        {
+          name: 'Briefings Daya',
+          description:
+            'Bilans et résumés du matin et du soir',
+          importance:
+            Notifications.AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [0, 250, 150, 250],
+          enableVibrate: true,
+          enableLights: true,
+          lightColor: '#2563EB',
+          lockscreenVisibility:
+            Notifications
+              .AndroidNotificationVisibility
+              .PUBLIC,
+        }
+      );
     }
 
     const currentPermissions =
@@ -74,9 +151,11 @@ export async function registerPushTokenForUser(
 
     if (finalStatus !== 'granted') {
       const requestedPermissions =
-        await Notifications.requestPermissionsAsync();
+        await Notifications
+          .requestPermissionsAsync();
 
-      finalStatus = requestedPermissions.status;
+      finalStatus =
+        requestedPermissions.status;
     }
 
     if (finalStatus !== 'granted') {
@@ -84,13 +163,15 @@ export async function registerPushTokenForUser(
         .from('profiles')
         .update({
           push_enabled: false,
-          updated_at: new Date().toISOString(),
+          updated_at:
+            new Date().toISOString(),
         })
         .eq('id', userId);
 
       return {
         success: false,
-        error: "L'autorisation de notification n'a pas été accordée.",
+        error:
+          "L'autorisation de notification n'a pas été accordée.",
       };
     }
 
@@ -99,56 +180,37 @@ export async function registerPushTokenForUser(
     if (!projectId) {
       return {
         success: false,
-        error: 'Le projectId EAS est introuvable dans app.json.',
+        error:
+          'Le projectId EAS est introuvable dans app.json.',
       };
     }
 
+    /**
+     * Cette requête peut échouer temporairement
+     * si le téléphone vient juste de récupérer
+     * Internet après un redémarrage.
+     */
     const tokenResponse =
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
+      await Notifications
+        .getExpoPushTokenAsync({
+          projectId,
+        });
 
-    const expoPushToken = tokenResponse.data;
-    console.log("TOKEN DAYA :", expoPushToken);
+    const expoPushToken =
+      tokenResponse.data;
 
     if (!expoPushToken) {
       return {
         success: false,
-        error: "Expo n'a retourné aucun token push.",
-      };
-    }
-    
-
-    const timezone = getDeviceTimezone();
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        expo_push_token: expoPushToken,
-        push_enabled: true,
-        timezone,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId);
-
-    if (error) {
-      console.error(
-        "Erreur d'enregistrement du token push :",
-        error.message
-      );
-
-      return {
-        success: false,
-        error: error.message,
+        error:
+          "Expo n'a retourné aucun token push.",
       };
     }
 
-    console.log('Token push Daya enregistré avec succès.');
-
-    return {
-      success: true,
-      token: expoPushToken,
-    };
+    return await savePushToken(
+      userId,
+      expoPushToken
+    );
   } catch (error) {
     const message =
       error instanceof Error
@@ -156,7 +218,7 @@ export async function registerPushTokenForUser(
         : 'Erreur inconnue pendant la création du token push.';
 
     console.error(
-      "Erreur pendant l'initialisation du push Daya :",
+      'Erreur synchronisation push Daya :',
       error
     );
 
@@ -165,4 +227,40 @@ export async function registerPushTokenForUser(
       error: message,
     };
   }
+}
+
+/**
+ * Écoute une éventuelle rotation du token
+ * pendant que Daya est en fonctionnement.
+ */
+export function listenForPushTokenChanges(
+  userId: string
+) {
+  if (
+    Platform.OS === 'web' ||
+    !Device.isDevice ||
+    !userId
+  ) {
+    return null;
+  }
+
+  return Notifications.addPushTokenListener(
+    async () => {
+      console.log(
+        '🔄 Changement du token push détecté.'
+      );
+
+      const result =
+        await registerPushTokenForUser(
+          userId
+        );
+
+      if (!result.success) {
+        console.warn(
+          'Impossible de resynchroniser le token :',
+          result.error
+        );
+      }
+    }
+  );
 }
