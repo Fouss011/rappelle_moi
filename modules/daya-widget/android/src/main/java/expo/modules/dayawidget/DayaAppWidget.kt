@@ -1,11 +1,13 @@
 package expo.modules.dayawidget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Column
 import androidx.glance.layout.Spacer
@@ -50,10 +52,23 @@ private fun DayaWidgetContent(context: Context) {
     null
   )
 
+  // Permet d'ouvrir directement Daya
+  // lorsqu'on appuie sur le widget.
+  val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+    addCategory(Intent.CATEGORY_LAUNCHER)
+    setPackage(context.packageName)
+    flags =
+      Intent.FLAG_ACTIVITY_NEW_TASK or
+      Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+  }
+
   Column(
     modifier = GlanceModifier
       .fillMaxSize()
       .padding(16.dp)
+      .clickable(
+        actionStartActivity(launchIntent)
+      )
   ) {
 
     Text(
@@ -103,5 +118,17 @@ private fun DayaWidgetContent(context: Context) {
         )
       )
     }
+
+    Spacer(
+      modifier = GlanceModifier.height(10.dp)
+    )
+
+    Text(
+      text = "Appuyer pour ouvrir Daya",
+      style = TextStyle(
+        color = ColorProvider(Color.Gray),
+        fontSize = 11.sp
+      )
+    )
   }
 }

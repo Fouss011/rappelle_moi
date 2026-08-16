@@ -2,9 +2,11 @@ package expo.modules.dayawidget
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll
-import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class DayaWidgetModule : Module() {
 
@@ -12,10 +14,12 @@ class DayaWidgetModule : Module() {
 
     Name("DayaWidget")
 
-    AsyncFunction("setNextReminder") Coroutine { title: String, date: String ->
+    AsyncFunction("setNextReminder") {
+      title: String,
+      date: String ->
 
       val context = appContext.reactContext
-        ?: return@Coroutine false
+        ?: return@AsyncFunction false
 
       val preferences = context.getSharedPreferences(
         "daya_widget_preferences",
@@ -28,15 +32,17 @@ class DayaWidgetModule : Module() {
         .putString("next_reminder_date", date)
         .apply()
 
-      DayaAppWidget().updateAll(context)
+      CoroutineScope(Dispatchers.Main).launch {
+        DayaAppWidget().updateAll(context)
+      }
 
       true
     }
 
-    AsyncFunction("clearNextReminder") Coroutine {
+    AsyncFunction("clearNextReminder") {
 
       val context = appContext.reactContext
-        ?: return@Coroutine false
+        ?: return@AsyncFunction false
 
       val preferences = context.getSharedPreferences(
         "daya_widget_preferences",
@@ -49,7 +55,9 @@ class DayaWidgetModule : Module() {
         .remove("next_reminder_date")
         .apply()
 
-      DayaAppWidget().updateAll(context)
+      CoroutineScope(Dispatchers.Main).launch {
+        DayaAppWidget().updateAll(context)
+      }
 
       true
     }
