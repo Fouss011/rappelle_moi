@@ -12,9 +12,7 @@ class DayaWidgetModule : Module() {
 
     Name("DayaWidget")
 
-    AsyncFunction("setNextReminder") Coroutine {
-      title: String,
-      date: String ->
+    AsyncFunction("setNextReminder") Coroutine { title: String, date: String ->
 
       val context = appContext.reactContext
         ?: return@Coroutine false
@@ -32,7 +30,7 @@ class DayaWidgetModule : Module() {
 
       DayaAppWidget().updateAll(context)
 
-      return@Coroutine true
+      true
     }
 
     AsyncFunction("clearNextReminder") Coroutine {
@@ -53,7 +51,7 @@ class DayaWidgetModule : Module() {
 
       DayaAppWidget().updateAll(context)
 
-      return@Coroutine true
+      true
     }
   }
 }
