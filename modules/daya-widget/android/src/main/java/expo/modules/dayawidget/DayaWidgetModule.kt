@@ -1,11 +1,9 @@
 package expo.modules.dayawidget
 
 import androidx.glance.appwidget.updateAll
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 
 class DayaWidgetModule : Module() {
 
@@ -13,51 +11,44 @@ class DayaWidgetModule : Module() {
 
     Name("DayaWidget")
 
-    AsyncFunction("syncReminders") {
+    AsyncFunction("syncReminders") Coroutine {
       remindersJson: String ->
 
       val context = appContext.reactContext
-        ?: return@AsyncFunction false
+        ?: return@Coroutine false
 
-      val saved =
-        DayaWidgetStore.saveReminders(
-          context,
-          remindersJson
-        )
+      val saved = DayaWidgetStore.saveReminders(
+        context,
+        remindersJson
+      )
 
       if (!saved) {
-        return@AsyncFunction false
+        return@Coroutine false
       }
 
-      CoroutineScope(Dispatchers.Default)
-        .async {
-          DayaAppWidget().updateAll(context)
-        }
-        .await()
+      DayaAppWidget().updateAll(context)
 
-      DayaWidgetStore
-        .scheduleNextTransition(context)
+      DayaWidgetStore.scheduleNextTransition(
+        context
+      )
 
       true
     }
 
-    AsyncFunction("clearReminders") {
+    AsyncFunction("clearReminders") Coroutine { ->
 
       val context = appContext.reactContext
-        ?: return@AsyncFunction false
+        ?: return@Coroutine false
 
-      val cleared =
-        DayaWidgetStore.clear(context)
+      val cleared = DayaWidgetStore.clear(
+        context
+      )
 
       if (!cleared) {
-        return@AsyncFunction false
+        return@Coroutine false
       }
 
-      CoroutineScope(Dispatchers.Default)
-        .async {
-          DayaAppWidget().updateAll(context)
-        }
-        .await()
+      DayaAppWidget().updateAll(context)
 
       true
     }
