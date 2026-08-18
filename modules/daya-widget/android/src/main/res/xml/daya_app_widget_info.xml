@@ -7,4 +7,5 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:initialLayout="@android:layout/simple_list_item_1"
-    android:description="@string/daya_widget_description" />
+    android:description="@string/daya_widget_description"
+    android:updatePeriodMillis="1800000" />

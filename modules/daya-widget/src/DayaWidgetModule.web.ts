@@ -1,4 +1,4 @@
-import { registerWebModule, NativeModule } from 'expo';
+import { NativeModule, registerWebModule } from 'expo';
 
 class DayaWidgetModule extends NativeModule<{}> {}
 

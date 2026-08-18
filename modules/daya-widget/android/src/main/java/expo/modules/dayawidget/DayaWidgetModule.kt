@@ -1,12 +1,11 @@
 package expo.modules.dayawidget
 
-import android.content.Context
 import androidx.glance.appwidget.updateAll
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 class DayaWidgetModule : Module() {
 
@@ -14,64 +13,53 @@ class DayaWidgetModule : Module() {
 
     Name("DayaWidget")
 
-    AsyncFunction("setNextReminder") {
-      title: String,
-      date: String ->
+    AsyncFunction("syncReminders") {
+      remindersJson: String ->
 
       val context = appContext.reactContext
         ?: return@AsyncFunction false
 
-      val preferences = context.getSharedPreferences(
-        "daya_widget_preferences",
-        Context.MODE_PRIVATE
-      )
+      val saved =
+        DayaWidgetStore.saveReminders(
+          context,
+          remindersJson
+        )
 
-      preferences
-        .edit()
-        .putString("next_reminder_title", title)
-        .putString("next_reminder_date", date)
-        .apply()
-
-      /*
-       * Glance updateAll() est suspend.
-       * On le lance explicitement dans une coroutine.
-       */
-      CoroutineScope(Dispatchers.Main).launch {
-        try {
-          DayaAppWidget().updateAll(context)
-        } catch (error: Exception) {
-          error.printStackTrace()
-        }
+      if (!saved) {
+        return@AsyncFunction false
       }
 
-      return@AsyncFunction true
+      CoroutineScope(Dispatchers.Default)
+        .async {
+          DayaAppWidget().updateAll(context)
+        }
+        .await()
+
+      DayaWidgetStore
+        .scheduleNextTransition(context)
+
+      true
     }
 
-    AsyncFunction("clearNextReminder") {
+    AsyncFunction("clearReminders") {
 
       val context = appContext.reactContext
         ?: return@AsyncFunction false
 
-      val preferences = context.getSharedPreferences(
-        "daya_widget_preferences",
-        Context.MODE_PRIVATE
-      )
+      val cleared =
+        DayaWidgetStore.clear(context)
 
-      preferences
-        .edit()
-        .remove("next_reminder_title")
-        .remove("next_reminder_date")
-        .apply()
-
-      CoroutineScope(Dispatchers.Main).launch {
-        try {
-          DayaAppWidget().updateAll(context)
-        } catch (error: Exception) {
-          error.printStackTrace()
-        }
+      if (!cleared) {
+        return@AsyncFunction false
       }
 
-      return@AsyncFunction true
+      CoroutineScope(Dispatchers.Default)
+        .async {
+          DayaAppWidget().updateAll(context)
+        }
+        .await()
+
+      true
     }
   }
 }
