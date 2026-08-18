@@ -32,11 +32,19 @@ class DayaWidgetModule : Module() {
         .putString("next_reminder_date", date)
         .apply()
 
+      /*
+       * Glance updateAll() est suspend.
+       * On le lance explicitement dans une coroutine.
+       */
       CoroutineScope(Dispatchers.Main).launch {
-        DayaAppWidget().updateAll(context)
+        try {
+          DayaAppWidget().updateAll(context)
+        } catch (error: Exception) {
+          error.printStackTrace()
+        }
       }
 
-      true
+      return@AsyncFunction true
     }
 
     AsyncFunction("clearNextReminder") {
@@ -56,10 +64,14 @@ class DayaWidgetModule : Module() {
         .apply()
 
       CoroutineScope(Dispatchers.Main).launch {
-        DayaAppWidget().updateAll(context)
+        try {
+          DayaAppWidget().updateAll(context)
+        } catch (error: Exception) {
+          error.printStackTrace()
+        }
       }
 
-      true
+      return@AsyncFunction true
     }
   }
 }

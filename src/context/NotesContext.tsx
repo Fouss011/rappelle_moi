@@ -1110,47 +1110,82 @@ if (detected) {
       });
   }, [notes]);
 
-  useEffect(() => {
+  const syncWidget = useCallback(async () => {
   if (Platform.OS !== 'android') {
     return;
   }
 
-  const syncWidget = async () => {
-    try {
-      const nextReminder = scheduledReminders[0];
+  try {
+    const nextReminder = scheduledReminders[0];
 
-      if (!nextReminder?.reminderAtIso) {
-        await DayaWidgetModule.clearNextReminder();
-        return;
-      }
+    if (!nextReminder?.reminderAtIso) {
+      console.log(
+        'Widget Daya : aucun rappel à afficher.'
+      );
 
-      const reminderDate = new Date(
+      await DayaWidgetModule.clearNextReminder();
+
+      return;
+    }
+
+    const reminderDate = new Date(
+      nextReminder.reminderAtIso
+    );
+
+    if (Number.isNaN(reminderDate.getTime())) {
+      console.warn(
+        'Widget Daya : date de rappel invalide.',
         nextReminder.reminderAtIso
       );
 
-      const formattedDate =
-        reminderDate.toLocaleString('fr-FR', {
-          weekday: 'short',
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+      await DayaWidgetModule.clearNextReminder();
 
-      await DayaWidgetModule.setNextReminder(
-        nextReminder.title || nextReminder.text,
-        formattedDate
-      );
-    } catch (error) {
-      console.error(
-        'Erreur synchronisation widget Daya :',
-        error
-      );
+      return;
     }
-  };
 
-  syncWidget();
+    const formattedDate =
+      reminderDate.toLocaleString('fr-FR', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+    const widgetTitle =
+      nextReminder.title?.trim() ||
+      nextReminder.text.trim();
+
+    console.log(
+      'Widget Daya : synchronisation',
+      {
+        id: nextReminder.id,
+        title: widgetTitle,
+        reminderAtIso:
+          nextReminder.reminderAtIso,
+        formattedDate,
+      }
+    );
+
+    await DayaWidgetModule.setNextReminder(
+      widgetTitle,
+      formattedDate
+    );
+
+    console.log(
+      'Widget Daya : synchronisation terminée.'
+    );
+  } catch (error) {
+    console.error(
+      'Erreur synchronisation widget Daya :',
+      error
+    );
+  }
 }, [scheduledReminders]);
+
+useEffect(() => {
+  void syncWidget();
+}, [syncWidget]);
 
   const pendingNotes = useMemo(() => {
     return notes
