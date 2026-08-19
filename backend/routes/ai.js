@@ -64,7 +64,7 @@ router.post(
   requireUser,
   async (req, res) => {
     try {
-      const { text } = req.body;
+      const { text, excludeNoteId } = req.body;
       const userId = req.user.id;
 
       if (!text?.trim()) {
@@ -76,7 +76,13 @@ router.post(
 
       const result = await findRelatedNotes(
         text.trim(),
-        userId
+        userId,
+        {
+          excludeNoteId:
+            typeof excludeNoteId === 'string'
+              ? excludeNoteId
+              : null,
+        }
       );
 
       return res.json({

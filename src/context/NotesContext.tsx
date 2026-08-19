@@ -12,6 +12,12 @@ import { Platform } from 'react-native';
 import DayaWidgetModule from '../../modules/daya-widget/src/DayaWidgetModule';
 import { analyseNoteWithAI } from '../services/aiNoteService';
 import { refreshLivingMemory } from '../services/livingMemoryService';
+import type {
+  MemoryConnection,
+} from '../services/relatedNotesService';
+import {
+  findRelatedNotesForMemory,
+} from '../services/relatedNotesService';
 import { supabase } from '../services/supabase';
 import { detectCategory } from '../utils/categoryUtils';
 import { detectSmartReminder } from '../utils/smartReminderUtils';
@@ -45,6 +51,8 @@ type NotesContextValue = {
   toggleImportant: (id: string) => Promise<void>;
   scheduledReminders: Note[];
   pendingNotes: Note[];
+  lastMemoryConnection: MemoryConnection | null;
+  dismissMemoryConnection: () => void;
 };
 
 type DetectedReminder = {
@@ -485,6 +493,8 @@ export function NotesProvider({
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [saving, setSaving] = useState(false);
+  const [lastMemoryConnection, setLastMemoryConnection] =
+    useState<MemoryConnection | null>(null);
 
   const { user, session } = useAuth();
 
@@ -506,6 +516,39 @@ export function NotesProvider({
       }
     });
   }, [session?.access_token]);
+
+  const connectNewNoteToMemory = useCallback(
+    (text: string, noteId: string) => {
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        return;
+      }
+
+      void findRelatedNotesForMemory({
+        text,
+        accessToken,
+        excludeNoteId: noteId,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn(
+            'La connexion mémoire n’a pas pu être recherchée :',
+            result.error
+          );
+          return;
+        }
+
+        setLastMemoryConnection(
+          result.connection ?? null
+        );
+      });
+    },
+    [session?.access_token]
+  );
+
+  const dismissMemoryConnection = useCallback(() => {
+    setLastMemoryConnection(null);
+  }, []);
   
   useEffect(() => {
     if (!user) {
@@ -855,6 +898,10 @@ if (detected) {
       }
 
       refreshMemoryInBackground();
+      connectNewNoteToMemory(
+        cleanText,
+        newNote.id
+      );
       setNote('');
     } catch (error) {
       console.error(
@@ -868,6 +915,7 @@ if (detected) {
     note,
     saveNoteToSupabase,
     refreshMemoryInBackground,
+    connectNewNoteToMemory,
     saving,
     user,
     session?.access_token,
@@ -1201,6 +1249,8 @@ if (detected) {
         toggleImportant,
         scheduledReminders,
         pendingNotes,
+        lastMemoryConnection,
+        dismissMemoryConnection,
       }}
     >
       {children}

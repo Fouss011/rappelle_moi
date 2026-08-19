@@ -1,7 +1,7 @@
 const openai = require('../config/openai');
 const supabase = require('../config/supabase');
 
-async function findRelatedNotes(text, userId) {
+async function findRelatedNotes(text, userId, options = {}) {
   const cleanText = text?.trim();
 
   if (!cleanText) {
@@ -27,7 +27,26 @@ async function findRelatedNotes(text, userId) {
     throw new Error(error.message);
   }
 
-  const existingNotes = notes ?? [];
+  const excludedNoteId =
+    typeof options.excludeNoteId === 'string'
+      ? options.excludeNoteId
+      : null;
+
+  const existingNotes = (notes ?? []).filter(
+    (note) => note.id !== excludedNoteId
+  );
+
+  if (existingNotes.length === 0) {
+    return {
+      title: '',
+      keywords: [],
+      people: [],
+      projects: [],
+      topics: [],
+      relatedNotes: [],
+      explanation: '',
+    };
+  }
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',

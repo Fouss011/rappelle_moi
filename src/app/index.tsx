@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
 import { HeroCard } from '../components/HeroCard';
 import { HomeMenu } from '../components/HomeMenu';
+import { LivingMemoryHomeCard } from '../components/LivingMemoryHomeCard';
 import { MemoryAssistantSheet } from '../components/MemoryAssistantSheet';
 import { NextReminderCard } from '../components/NextReminderCard';
 import { QuickCaptureCard } from '../components/QuickCaptureCard';
@@ -26,7 +27,13 @@ import {
 } from '../services/pushTokenService';
 
 export default function HomeScreen() {
-  const { user, profile, loading, refreshProfile } = useAuth();
+  const {
+    user,
+    profile,
+    session,
+    loading,
+    refreshProfile,
+  } = useAuth();
   const [memoryOpen, setMemoryOpen] = useState(false);
 
   const {
@@ -36,6 +43,8 @@ export default function HomeScreen() {
     saving,
     scheduledReminders,
     pendingNotes,
+    lastMemoryConnection,
+    dismissMemoryConnection,
   } = useNotes();
 
   const hasSavedContent =
@@ -199,6 +208,13 @@ export default function HomeScreen() {
           setNote={setNote}
           onAddNote={addNote}
           loading={saving}
+        />
+
+        <LivingMemoryHomeCard
+          accessToken={session?.access_token}
+          connection={lastMemoryConnection}
+          onDismissConnection={dismissMemoryConnection}
+          onOpenMemory={() => router.push('/memory')}
         />
 
         {!hasSavedContent ? (
