@@ -1,33 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import type {
-    LivingMemoryItem,
-    LivingMemoryProfile,
+  LivingMemoryItem,
+  LivingMemoryProfile,
 } from '../services/livingMemoryService';
 import {
-    getLivingMemory,
-    refreshLivingMemory,
+  getLivingMemory,
+  refreshLivingMemory,
 } from '../services/livingMemoryService';
 import type {
-    MemoryConnection,
+  MemoryConnection,
 } from '../services/relatedNotesService';
+
+export type LivingMemoryResumeItem = LivingMemoryItem & {
+  kind: 'project' | 'loop' | 'goal';
+};
 
 type LivingMemoryHomeCardProps = {
   accessToken?: string;
   connection: MemoryConnection | null;
   onDismissConnection: () => void;
+  onOpenConnection: (connection: MemoryConnection) => void;
+  onOpenResumeItem: (item: LivingMemoryResumeItem) => void;
   onOpenMemory: () => void;
-};
-
-type ResumeItem = LivingMemoryItem & {
-  kind: 'project' | 'loop' | 'goal';
 };
 
 function getTimestamp(value?: string | null) {
@@ -39,7 +41,7 @@ function getTimestamp(value?: string | null) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
-function getKindLabel(kind: ResumeItem['kind']) {
+function getKindLabel(kind: LivingMemoryResumeItem['kind']) {
   if (kind === 'project') {
     return 'Projet';
   }
@@ -55,6 +57,8 @@ export function LivingMemoryHomeCard({
   accessToken,
   connection,
   onDismissConnection,
+  onOpenConnection,
+  onOpenResumeItem,
   onOpenMemory,
 }: LivingMemoryHomeCardProps) {
   const [memory, setMemory] =
@@ -77,8 +81,6 @@ export function LivingMemoryHomeCard({
         return;
       }
 
-      // Première utilisation : on construit le profil uniquement
-      // s'il n'existe pas encore. Les ouvertures suivantes restent légères.
       const refreshResult =
         await refreshLivingMemory(accessToken);
 
@@ -99,9 +101,6 @@ export function LivingMemoryHomeCard({
     void loadMemory();
   }, [loadMemory]);
 
-  // Quand une nouvelle connexion est trouvée, NotesContext a aussi
-  // demandé une actualisation de la mémoire. On recharge ensuite
-  // l'aperçu afin que le projet ou la boucle puisse remonter sur l'accueil.
   useEffect(() => {
     if (!connection) {
       return;
@@ -114,7 +113,7 @@ export function LivingMemoryHomeCard({
     return () => clearTimeout(timeout);
   }, [connection, loadMemory]);
 
-  const resumeItems = useMemo<ResumeItem[]>(() => {
+  const resumeItems = useMemo<LivingMemoryResumeItem[]>(() => {
     if (!memory) {
       return [];
     }
@@ -143,6 +142,7 @@ export function LivingMemoryHomeCard({
 
         return (b.confidence ?? 0) - (a.confidence ?? 0);
       })
+      // L'accueil reste volontairement léger : 3 sujets maximum.
       .slice(0, 3);
   }, [memory]);
 
@@ -184,11 +184,11 @@ export function LivingMemoryHomeCard({
           </Text>
 
           <TouchableOpacity
-            onPress={onOpenMemory}
+            onPress={() => onOpenConnection(connection)}
             style={styles.connectionAction}
           >
             <Text style={styles.connectionActionText}>
-              Voir dans ma mémoire →
+              Voir le fil de cette idée →
             </Text>
           </TouchableOpacity>
         </View>
@@ -229,7 +229,7 @@ export function LivingMemoryHomeCard({
               <TouchableOpacity
                 key={`${item.kind}-${item.label}-${index}`}
                 style={styles.resumeItem}
-                onPress={onOpenMemory}
+                onPress={() => onOpenResumeItem(item)}
                 activeOpacity={0.8}
               >
                 <View style={styles.kindPill}>
@@ -270,140 +270,125 @@ const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
     marginTop: 16,
+    gap: 12,
   },
-
   connectionCard: {
     borderRadius: 22,
     padding: 18,
-    backgroundColor: '#EEF4FF',
+    backgroundColor: '#F4F7FF',
     borderWidth: 1,
-    borderColor: '#D7E4FF',
+    borderColor: '#DDE6FF',
   },
-
   connectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
-
   connectionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#172554',
+    backgroundColor: '#E4EBFF',
   },
-
   connectionIconText: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
+    color: '#3156D3',
   },
-
   connectionHeaderText: {
     flex: 1,
-    marginLeft: 12,
+    paddingHorizontal: 12,
   },
-
   connectionEyebrow: {
     fontSize: 10,
-    letterSpacing: 0.9,
+    letterSpacing: 0.8,
     fontWeight: '900',
-    color: '#2563EB',
+    color: '#6378B8',
   },
-
   connectionTitle: {
-    marginTop: 3,
-    fontSize: 16,
-    lineHeight: 20,
+    marginTop: 4,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: '900',
-    color: '#172554',
+    color: '#1E293B',
   },
-
   closeButton: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.8)',
   },
-
   closeButtonText: {
-    fontSize: 24,
+    fontSize: 20,
+    lineHeight: 22,
     color: '#64748B',
   },
-
   connectionText: {
     marginTop: 12,
     fontSize: 13,
     lineHeight: 20,
     fontWeight: '600',
-    color: '#475569',
+    color: '#53627C',
   },
-
   connectionAction: {
     alignSelf: 'flex-start',
-    marginTop: 12,
+    marginTop: 14,
+    paddingVertical: 4,
   },
-
   connectionActionText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#2563EB',
+    color: '#3156D3',
   },
-
   loadingCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    backgroundColor: 'rgba(255,255,255,0.94)',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-
   loadingText: {
-    marginLeft: 10,
+    flex: 1,
     fontSize: 13,
     fontWeight: '700',
     color: '#64748B',
   },
-
   resumeCard: {
-    marginTop: 12,
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 18,
     backgroundColor: 'rgba(255,255,255,0.96)',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-
   resumeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   resumeEyebrow: {
     fontSize: 10,
-    letterSpacing: 0.9,
+    letterSpacing: 0.8,
     fontWeight: '900',
-    color: '#64748B',
+    color: '#8B5CF6',
   },
-
   resumeTitle: {
     marginTop: 3,
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#1E293B',
   },
-
   seeAllText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#2563EB',
+    color: '#5B5BD6',
   },
-
   resumeIntro: {
     marginTop: 8,
     fontSize: 13,
@@ -411,53 +396,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
   },
-
   resumeList: {
     marginTop: 12,
+    gap: 9,
   },
-
   resumeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#EEF2F7',
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
   },
-
   kindPill: {
-    minWidth: 67,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    minWidth: 64,
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    backgroundColor: '#EEF2FF',
   },
-
   kindPillText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
-    color: '#475569',
+    color: '#5B5BD6',
   },
-
   resumeItemText: {
     flex: 1,
     marginLeft: 11,
   },
-
   resumeItemTitle: {
     fontSize: 14,
     fontWeight: '900',
     color: '#1E293B',
   },
-
   resumeItemDescription: {
     marginTop: 3,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: '600',
     color: '#64748B',
   },
-
   chevron: {
     marginLeft: 8,
     fontSize: 24,

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
 import { HeroCard } from '../components/HeroCard';
 import { HomeMenu } from '../components/HomeMenu';
+import type { LivingMemoryResumeItem } from '../components/LivingMemoryHomeCard';
 import { LivingMemoryHomeCard } from '../components/LivingMemoryHomeCard';
 import { MemoryAssistantSheet } from '../components/MemoryAssistantSheet';
 import { NextReminderCard } from '../components/NextReminderCard';
@@ -25,6 +26,7 @@ import {
   listenForPushTokenChanges,
   registerPushTokenForUser,
 } from '../services/pushTokenService';
+import type { MemoryConnection } from '../services/relatedNotesService';
 
 export default function HomeScreen() {
   const {
@@ -214,6 +216,36 @@ export default function HomeScreen() {
           accessToken={session?.access_token}
           connection={lastMemoryConnection}
           onDismissConnection={dismissMemoryConnection}
+          onOpenConnection={(connection: MemoryConnection) => {
+            // Une connexion consultée est considérée comme lue :
+            // la carte disparaît quand l'utilisateur revient à l'accueil.
+            dismissMemoryConnection();
+
+            router.push({
+              pathname: '/memory-topic',
+              params: {
+                source: 'connection',
+                title:
+                  connection.title ||
+                  'Cette idée a une histoire',
+                description:
+                  connection.explanation || '',
+                noteIds: connection.relatedNotes
+                  .map((item) => item.id)
+                  .join(','),
+              },
+            } as never);
+          }}
+          onOpenResumeItem={(item: LivingMemoryResumeItem) => {
+            router.push({
+              pathname: '/memory-topic',
+              params: {
+                source: 'memory',
+                kind: item.kind,
+                label: item.label,
+              },
+            } as never);
+          }}
           onOpenMemory={() => router.push('/memory')}
         />
 
