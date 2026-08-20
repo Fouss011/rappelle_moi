@@ -13,6 +13,19 @@ import DayaWidgetModule from '../../modules/daya-widget/src/DayaWidgetModule';
 import { analyseNoteWithAI } from '../services/aiNoteService';
 import { refreshLivingMemory } from '../services/livingMemoryService';
 import type {
+  RecurringReminder,
+  RecurringReminderSuggestion,
+} from '../services/recurringReminderService';
+import {
+  cancelLocalRecurringReminder,
+  createRecurringReminder,
+  deleteRecurringReminder,
+  detectRecurringReminderSuggestion,
+  loadRecurringReminders,
+  setRecurringReminderEnabled,
+  syncLocalRecurringReminders,
+} from '../services/recurringReminderService';
+import type {
   MemoryConnection,
 } from '../services/relatedNotesService';
 import {
@@ -54,6 +67,12 @@ type NotesContextValue = {
   pendingNotes: Note[];
   lastMemoryConnection: MemoryConnection | null;
   dismissMemoryConnection: () => void;
+  recurringReminders: RecurringReminder[];
+  recurringReminderSuggestion: RecurringReminderSuggestion | null;
+  confirmRecurringReminderSuggestion: () => Promise<boolean>;
+  dismissRecurringReminderSuggestion: () => void;
+  toggleRecurringReminder: (id: string, enabled: boolean) => Promise<boolean>;
+  removeRecurringReminder: (id: string) => Promise<boolean>;
 };
 
 type DetectedReminder = {
@@ -498,6 +517,14 @@ export function NotesProvider({
     lastMemoryConnection,
     setLastMemoryConnection,
   ] = useState<MemoryConnection | null>(null);
+  const [
+    recurringReminders,
+    setRecurringReminders,
+  ] = useState<RecurringReminder[]>([]);
+  const [
+    recurringReminderSuggestion,
+    setRecurringReminderSuggestion,
+  ] = useState<RecurringReminderSuggestion | null>(null);
 
   const { user, session } = useAuth();
 
@@ -552,6 +579,124 @@ export function NotesProvider({
   const dismissMemoryConnection = useCallback(() => {
     setLastMemoryConnection(null);
   }, []);
+
+  const dismissRecurringReminderSuggestion = useCallback(() => {
+    setRecurringReminderSuggestion(null);
+  }, []);
+
+  const reloadRecurringReminders = useCallback(async () => {
+    if (!user) {
+      setRecurringReminders([]);
+      return;
+    }
+
+    try {
+      const items = await loadRecurringReminders(user.id);
+      setRecurringReminders(items);
+    } catch (error) {
+      console.warn(
+        'Impossible de charger les rappels récurrents :',
+        error
+      );
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void reloadRecurringReminders();
+  }, [reloadRecurringReminders]);
+
+  useEffect(() => {
+    void syncLocalRecurringReminders(recurringReminders);
+  }, [recurringReminders]);
+
+  const confirmRecurringReminderSuggestion = useCallback(async () => {
+    if (!user || !recurringReminderSuggestion) {
+      return false;
+    }
+
+    try {
+      const created = await createRecurringReminder({
+        userId: user.id,
+        suggestion: recurringReminderSuggestion,
+      });
+
+      setRecurringReminders((current) => [
+        created,
+        ...current,
+      ]);
+      setRecurringReminderSuggestion(null);
+      return true;
+    } catch (error) {
+      console.warn(
+        'Impossible d’activer le rappel récurrent :',
+        error
+      );
+      return false;
+    }
+  }, [recurringReminderSuggestion, user]);
+
+  const toggleRecurringReminder = useCallback(
+    async (id: string, enabled: boolean) => {
+      if (!user) {
+        return false;
+      }
+
+      try {
+        const updated = await setRecurringReminderEnabled({
+          userId: user.id,
+          id,
+          enabled,
+        });
+
+        setRecurringReminders((current) =>
+          current.map((item) =>
+            item.id === id ? updated : item
+          )
+        );
+
+        if (!enabled) {
+          await cancelLocalRecurringReminder(id);
+        }
+
+        return true;
+      } catch (error) {
+        console.warn(
+          'Impossible de modifier le rappel récurrent :',
+          error
+        );
+        return false;
+      }
+    },
+    [user]
+  );
+
+  const removeRecurringReminder = useCallback(
+    async (id: string) => {
+      if (!user) {
+        return false;
+      }
+
+      try {
+        await deleteRecurringReminder({
+          userId: user.id,
+          id,
+        });
+        await cancelLocalRecurringReminder(id);
+
+        setRecurringReminders((current) =>
+          current.filter((item) => item.id !== id)
+        );
+        return true;
+      } catch (error) {
+        console.warn(
+          'Impossible de supprimer le rappel récurrent :',
+          error
+        );
+        return false;
+      }
+    },
+    [user]
+  );
   
   useEffect(() => {
     if (!user) {
@@ -902,10 +1047,25 @@ if (detected) {
 
       refreshMemoryInBackground();
 
-      connectNewNoteToMemory(
-        cleanText,
-        newNote.id
-      );
+      if (newNote.type === 'note') {
+        connectNewNoteToMemory(
+          cleanText,
+          newNote.id
+        );
+      } else {
+        setLastMemoryConnection(null);
+
+        const recurringSuggestion =
+          detectRecurringReminderSuggestion({
+            notes: [newNote, ...notes],
+            sourceReminder: newNote,
+            recurringReminders,
+          });
+
+        setRecurringReminderSuggestion(
+          recurringSuggestion
+        );
+      }
 
       setNote('');
     } catch (error) {
@@ -921,6 +1081,8 @@ if (detected) {
     saveNoteToSupabase,
     refreshMemoryInBackground,
     connectNewNoteToMemory,
+    recurringReminders,
+    notes,
     saving,
     user,
     session?.access_token,
@@ -1374,6 +1536,12 @@ if (detected) {
         pendingNotes,
         lastMemoryConnection,
         dismissMemoryConnection,
+        recurringReminders,
+        recurringReminderSuggestion,
+        confirmRecurringReminderSuggestion,
+        dismissRecurringReminderSuggestion,
+        toggleRecurringReminder,
+        removeRecurringReminder,
       }}
     >
       {children}

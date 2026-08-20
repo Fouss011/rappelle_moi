@@ -121,8 +121,8 @@ const styles = StyleSheet.create({
   },
 
   time: {
-    width: 96,
-    minWidth: 96,
+    width: 112,
+    minWidth: 112,
     paddingTop: 2,
     fontSize: 14,
     textAlign: 'center',

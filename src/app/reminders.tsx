@@ -175,7 +175,12 @@ function groupReminders(items: Note[]): ReminderGroup[] {
 }
 
 export default function RemindersScreen() {
-  const { notes, toggleDone, updateNote } = useNotes();
+  const {
+    notes,
+    toggleDone,
+    updateNote,
+    recurringReminders,
+  } = useNotes();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -227,6 +232,30 @@ export default function RemindersScreen() {
             rappel{total > 1 ? 's' : ''} à suivre
           </Text>
         </View>
+
+        <TouchableOpacity
+          style={styles.recurringShortcut}
+          onPress={() =>
+            router.push('/recurring-reminders' as never)
+          }
+          activeOpacity={0.8}
+        >
+          <View style={styles.recurringShortcutText}>
+            <Text style={styles.recurringShortcutTitle}>
+              ↻ Rappels récurrents
+            </Text>
+            <Text style={styles.recurringShortcutSubtitle}>
+              {recurringReminders.length === 0
+                ? 'Aucune habitude automatisée pour le moment.'
+                : `${recurringReminders.length} rappel${
+                    recurringReminders.length > 1 ? 's' : ''
+                  } récurrent${
+                    recurringReminders.length > 1 ? 's' : ''
+                  } à gérer.`}
+            </Text>
+          </View>
+          <Text style={styles.recurringChevron}>›</Text>
+        </TouchableOpacity>
 
         {total === 0 ? (
           <View style={styles.emptyBox}>
@@ -569,4 +598,42 @@ const styles = StyleSheet.create({
   saveEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#2563EB' },
   saveEditText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
 
+
+
+  recurringShortcut: {
+    marginBottom: 18,
+    borderRadius: 22,
+    paddingHorizontal: 17,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+
+  recurringShortcutText: {
+    flex: 1,
+  },
+
+  recurringShortcutTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '900',
+    color: '#1D4ED8',
+  },
+
+  recurringShortcutSubtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+
+  recurringChevron: {
+    marginLeft: 10,
+    fontSize: 26,
+    color: '#60A5FA',
+  },
 });

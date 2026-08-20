@@ -9,6 +9,9 @@ const {
   processDueReminders,
   processPendingReceipts,
 } = require('./reminderPushService');
+const {
+  processRecurringReminders,
+} = require('./recurringReminderPushService');
 
 function startScheduler() {
   cron.schedule(
@@ -94,6 +97,31 @@ function startScheduler() {
   );
 
   cron.schedule(
+    '* * * * *',
+    async () => {
+      try {
+        const result =
+          await processRecurringReminders();
+
+        if (result.found > 0 || result.failed > 0) {
+          console.log(
+            '↻ Rappels récurrents traités :',
+            result
+          );
+        }
+      } catch (error) {
+        console.error(
+          '❌ Erreur traitement rappels récurrents :',
+          error.message
+        );
+      }
+    },
+    {
+      timezone: 'Europe/Paris',
+    }
+  );
+
+  cron.schedule(
     '*/5 * * * *',
     async () => {
       try {
@@ -122,7 +150,7 @@ function startScheduler() {
   );
 
   console.log(
-    '⏰ Scheduler Daya actif : 8 h, 21 h, rappels chaque minute, reçus toutes les 5 minutes.'
+    '⏰ Scheduler Daya actif : 8 h, 21 h, rappels et récurrents chaque minute, reçus toutes les 5 minutes.'
   );
 }
 

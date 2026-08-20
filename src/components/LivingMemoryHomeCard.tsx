@@ -296,7 +296,10 @@ export function LivingMemoryHomeCard({
                 activeOpacity={0.8}
               >
                 <View style={styles.kindPill}>
-                  <Text style={styles.kindPillText}>
+                  <Text
+                    style={styles.kindPillText}
+                    numberOfLines={1}
+                  >
                     {getKindLabel(item.kind)}
                   </Text>
                 </View>
@@ -512,8 +515,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   kindPill: {
-    width: 96,
-    minWidth: 96,
+    width: 112,
+    minWidth: 112,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
@@ -522,8 +526,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
   },
   kindPillText: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 14,
+    width: '100%',
+    textAlign: 'center',
     fontWeight: '900',
     color: '#5B5BD6',
   },
