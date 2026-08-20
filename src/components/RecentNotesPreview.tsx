@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
-    padding: 18,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E6ECF5',
@@ -89,14 +89,14 @@ const styles = StyleSheet.create({
 
   subtitle: {
     marginTop: 3,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
     color: '#94A3B8',
   },
 
   link: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
     color: '#2563EB',
   },
@@ -121,29 +121,32 @@ const styles = StyleSheet.create({
   },
 
   time: {
-    width: 50,
+    width: 96,
+    minWidth: 96,
     paddingTop: 2,
-    fontSize: 12,
+    fontSize: 14,
+    textAlign: 'center',
     fontWeight: '900',
-    color: '#94A3B8',
+    color: '#8190A6',
   },
 
   content: {
     flex: 1,
+    marginLeft: 12,
   },
 
   noteTitle: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
     color: '#0F172A',
   },
 
   noteText: {
     marginTop: 3,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#5F6F85',
   },
 });

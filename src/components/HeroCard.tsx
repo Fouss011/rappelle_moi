@@ -32,9 +32,9 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    marginBottom: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E6ECF5',
     flexDirection: 'row',
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
 
   date: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#64748B',
   },

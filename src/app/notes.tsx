@@ -101,11 +101,15 @@ export default function NotesScreen() {
   const {
     notes,
     deleteNote,
+    updateNote,
     toggleDone,
     toggleImportant,
   } = useNotes();
 
   const [search, setSearch] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const noteGroups = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -203,11 +207,52 @@ export default function NotesScreen() {
                     {item.title}
                   </Text>
 
-                  <Text style={styles.noteText}>
-                    {item.text}
-                  </Text>
+                  {editingId === item.id ? (
+                    <View style={styles.editBox}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editingText}
+                        onChangeText={setEditingText}
+                        multiline
+                        autoFocus
+                        placeholder="Modifier cette note..."
+                        placeholderTextColor="#94A3B8"
+                      />
+                      <View style={styles.editActions}>
+                        <TouchableOpacity
+                          style={styles.cancelEditButton}
+                          onPress={() => { setEditingId(null); setEditingText(''); }}
+                          disabled={savingEdit}
+                        >
+                          <Text style={styles.cancelEditText}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.saveEditButton}
+                          onPress={async () => {
+                            if (!editingText.trim()) return;
+                            setSavingEdit(true);
+                            const success = await updateNote(item.id, editingText);
+                            setSavingEdit(false);
+                            if (success) { setEditingId(null); setEditingText(''); }
+                          }}
+                          disabled={savingEdit}
+                        >
+                          <Text style={styles.saveEditText}>
+                            {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.noteText}>{item.text}</Text>
+                  )}
 
                   <View style={styles.actions}>
+                    <TouchableOpacity
+                      onPress={() => { setEditingId(item.id); setEditingText(item.text); }}
+                    >
+                      <Text style={styles.edit}>Modifier</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() =>
                         void toggleImportant(item.id)
@@ -336,7 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     textAlign: 'center',
     textAlignVertical: 'center',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     color: '#2563EB',
     backgroundColor: '#EFF6FF',
@@ -380,7 +425,7 @@ const styles = StyleSheet.create({
   },
 
   type: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     color: '#2563EB',
     backgroundColor: '#EFF6FF',
@@ -431,9 +476,22 @@ const styles = StyleSheet.create({
 },
 
 noteText: {
-  fontSize: 14,
-  lineHeight: 21,
+  fontSize: 15,
+  lineHeight: 22,
   fontWeight: '700',
-  color: '#64748B',
+  color: '#5F6F85',
 },
+  edit: { fontSize: 14, fontWeight: '900', color: '#2563EB' },
+  editBox: { marginTop: 10 },
+  editInput: {
+    minHeight: 110, borderRadius: 16, borderWidth: 1, borderColor: '#DCE6F5',
+    backgroundColor: '#F8FAFC', paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 15, lineHeight: 22, color: '#0F172A', textAlignVertical: 'top',
+  },
+  editActions: { marginTop: 10, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cancelEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1F5F9' },
+  cancelEditText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+  saveEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#2563EB' },
+  saveEditText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+
 });

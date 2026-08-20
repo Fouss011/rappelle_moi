@@ -1,6 +1,10 @@
 const openai = require('../config/openai');
 const supabase = require('../config/supabase');
 
+const {
+  getDecidedRelatedIds,
+} = require('./memoryConnectionService');
+
 async function findRelatedNotes(text, userId, options = {}) {
   const cleanText = text?.trim();
 
@@ -17,7 +21,7 @@ async function findRelatedNotes(text, userId, options = {}) {
   const { data: notes, error } = await supabase
     .from('notes')
     .select(
-      'id, text, created_at_iso, type, category, reminder_at_iso, is_done'
+      'id, title, text, created_at_iso, type, category, reminder_at_iso, is_done'
     )
     .eq('user_id', userId)
     .order('created_at_iso', { ascending: false })
@@ -32,8 +36,17 @@ async function findRelatedNotes(text, userId, options = {}) {
       ? options.excludeNoteId
       : null;
 
+  const decidedRelatedIds = await getDecidedRelatedIds({
+    userId,
+    sourceNoteId: excludedNoteId,
+  });
+
+  const decidedIds = new Set(decidedRelatedIds);
+
   const existingNotes = (notes ?? []).filter(
-    (note) => note.id !== excludedNoteId
+    (note) =>
+      note.id !== excludedNoteId &&
+      !decidedIds.has(note.id)
   );
 
   if (existingNotes.length === 0) {

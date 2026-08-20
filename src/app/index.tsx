@@ -27,6 +27,9 @@ import {
   registerPushTokenForUser,
 } from '../services/pushTokenService';
 import type { MemoryConnection } from '../services/relatedNotesService';
+import {
+  saveMemoryConnectionFeedback,
+} from '../services/relatedNotesService';
 
 export default function HomeScreen() {
   const {
@@ -216,9 +219,35 @@ export default function HomeScreen() {
           accessToken={session?.access_token}
           connection={lastMemoryConnection}
           onDismissConnection={dismissMemoryConnection}
-          onOpenConnection={(connection: MemoryConnection) => {
-            // Une connexion consultée est considérée comme lue :
-            // la carte disparaît quand l'utilisateur revient à l'accueil.
+          onConfirmConnection={async (connection: MemoryConnection) => {
+            const accessToken = session?.access_token;
+
+            if (!accessToken || !connection.sourceNoteId) {
+              console.warn(
+                'Connexion mémoire impossible à valider : session ou note source manquante.'
+              );
+              return;
+            }
+
+            const relatedNoteIds = connection.relatedNotes.map(
+              (item) => item.id
+            );
+
+            const result = await saveMemoryConnectionFeedback({
+              accessToken,
+              sourceNoteId: connection.sourceNoteId,
+              relatedNoteIds,
+              status: 'confirmed',
+            });
+
+            if (!result.success) {
+              console.warn(
+                'La connexion mémoire n’a pas pu être validée :',
+                result.error
+              );
+              return;
+            }
+
             dismissMemoryConnection();
 
             router.push({
@@ -230,11 +259,39 @@ export default function HomeScreen() {
                   'Cette idée a une histoire',
                 description:
                   connection.explanation || '',
-                noteIds: connection.relatedNotes
-                  .map((item) => item.id)
-                  .join(','),
+                noteIds: [
+                  connection.sourceNoteId,
+                  ...relatedNoteIds,
+                ].join(','),
               },
             } as never);
+          }}
+          onRejectConnection={async (connection: MemoryConnection) => {
+            const accessToken = session?.access_token;
+
+            if (!accessToken || !connection.sourceNoteId) {
+              dismissMemoryConnection();
+              return;
+            }
+
+            const result = await saveMemoryConnectionFeedback({
+              accessToken,
+              sourceNoteId: connection.sourceNoteId,
+              relatedNoteIds: connection.relatedNotes.map(
+                (item) => item.id
+              ),
+              status: 'rejected',
+            });
+
+            if (!result.success) {
+              console.warn(
+                'Le rejet de la connexion mémoire n’a pas pu être enregistré :',
+                result.error
+              );
+              return;
+            }
+
+            dismissMemoryConnection();
           }}
           onOpenResumeItem={(item: LivingMemoryResumeItem) => {
             router.push({
@@ -246,7 +303,9 @@ export default function HomeScreen() {
               },
             } as never);
           }}
-          onOpenMemory={() => router.push('/memory')}
+          onSeeConnections={() => {
+            router.push('/memory-connections');
+          }}
         />
 
         {!hasSavedContent ? (
@@ -359,12 +418,12 @@ content: {
   width: '100%',
   paddingHorizontal: 22,
   paddingTop: 90,
-  paddingBottom: 110,
+  paddingBottom: 150,
 },
 
   emptyGuideCard: {
-    marginTop: 16,
-    marginBottom: 4,
+    marginTop: 0,
+    marginBottom: 16,
     alignItems: 'center',
     borderRadius: 24,
     paddingHorizontal: 22,

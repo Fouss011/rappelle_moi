@@ -27,43 +27,57 @@ type LivingMemoryHomeCardProps = {
   accessToken?: string;
   connection: MemoryConnection | null;
   onDismissConnection: () => void;
-  onOpenConnection: (connection: MemoryConnection) => void;
+  onConfirmConnection: (
+    connection: MemoryConnection
+  ) => Promise<void>;
+  onRejectConnection: (
+    connection: MemoryConnection
+  ) => Promise<void>;
   onOpenResumeItem: (item: LivingMemoryResumeItem) => void;
-  onOpenMemory: () => void;
+  onSeeConnections: () => void;
 };
 
 function getTimestamp(value?: string | null) {
-  if (!value) {
-    return 0;
-  }
-
+  if (!value) return 0;
   const timestamp = new Date(value).getTime();
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function getKindLabel(kind: LivingMemoryResumeItem['kind']) {
-  if (kind === 'project') {
-    return 'Projet';
-  }
-
-  if (kind === 'loop') {
-    return 'À reprendre';
-  }
-
+  if (kind === 'project') return 'Projet';
+  if (kind === 'loop') return 'À reprendre';
   return 'Objectif';
+}
+
+function cleanSuggestionTitle(connection: MemoryConnection) {
+  const firstRelatedTitle =
+    connection.relatedNotes[0]?.title?.trim();
+
+  if (firstRelatedTitle) {
+    return firstRelatedTitle;
+  }
+
+  if (connection.title?.trim()) {
+    return connection.title.trim();
+  }
+
+  return 'une ancienne idée';
 }
 
 export function LivingMemoryHomeCard({
   accessToken,
   connection,
   onDismissConnection,
-  onOpenConnection,
+  onConfirmConnection,
+  onRejectConnection,
   onOpenResumeItem,
-  onOpenMemory,
+  onSeeConnections,
 }: LivingMemoryHomeCardProps) {
   const [memory, setMemory] =
     useState<LivingMemoryProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] =
+    useState<'yes' | 'no' | null>(null);
 
   const loadMemory = useCallback(async () => {
     if (!accessToken) {
@@ -102,9 +116,7 @@ export function LivingMemoryHomeCard({
   }, [loadMemory]);
 
   useEffect(() => {
-    if (!connection) {
-      return;
-    }
+    if (!connection) return;
 
     const timeout = setTimeout(() => {
       void loadMemory();
@@ -114,18 +126,14 @@ export function LivingMemoryHomeCard({
   }, [connection, loadMemory]);
 
   const resumeItems = useMemo<LivingMemoryResumeItem[]>(() => {
-    if (!memory) {
-      return [];
-    }
+    if (!memory) return [];
 
     const projects = (memory.active_projects ?? []).map(
       (item) => ({ ...item, kind: 'project' as const })
     );
-
     const loops = (memory.open_loops ?? []).map(
       (item) => ({ ...item, kind: 'loop' as const })
     );
-
     const goals = (memory.goals ?? []).map(
       (item) => ({ ...item, kind: 'goal' as const })
     );
@@ -142,13 +150,16 @@ export function LivingMemoryHomeCard({
 
         return (b.confidence ?? 0) - (a.confidence ?? 0);
       })
-      // L'accueil reste volontairement léger : 3 sujets maximum.
       .slice(0, 3);
   }, [memory]);
 
   if (!connection && resumeItems.length === 0 && !loading) {
     return null;
   }
+
+  const suggestedTitle = connection
+    ? cleanSuggestionTitle(connection)
+    : '';
 
   return (
     <View style={styles.wrapper}>
@@ -161,36 +172,84 @@ export function LivingMemoryHomeCard({
 
             <View style={styles.connectionHeaderText}>
               <Text style={styles.connectionEyebrow}>
-                CONNEXION TROUVÉE
+                CONNEXION PROPOSÉE
               </Text>
 
               <Text style={styles.connectionTitle}>
-                {connection.title || 'Cette idée a une histoire'}
+                Daya a retrouvé un fil possible
               </Text>
             </View>
 
             <TouchableOpacity
               onPress={onDismissConnection}
               style={styles.closeButton}
-              accessibilityLabel="Fermer la connexion mémoire"
+              accessibilityLabel="Décider plus tard"
+              disabled={feedbackLoading !== null}
             >
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.connectionText}>
-            {connection.explanation ||
-              `Daya a retrouvé ${connection.relatedNotes.length} ancienne(s) note(s) liée(s) à ce que tu viens d'écrire.`}
+          <Text style={styles.connectionQuestion}>
+            Cette idée semble poursuivre « {suggestedTitle} ».
+            Est-ce bien la suite ?
           </Text>
 
-          <TouchableOpacity
-            onPress={() => onOpenConnection(connection)}
-            style={styles.connectionAction}
-          >
-            <Text style={styles.connectionActionText}>
-              Voir le fil de cette idée →
+          {Boolean(connection.explanation?.trim()) ? (
+            <Text style={styles.connectionText}>
+              {connection.explanation}
             </Text>
-          </TouchableOpacity>
+          ) : null}
+
+          <View style={styles.feedbackRow}>
+            <TouchableOpacity
+              style={[
+                styles.yesButton,
+                feedbackLoading !== null && styles.disabledButton,
+              ]}
+              onPress={async () => {
+                setFeedbackLoading('yes');
+                try {
+                  await onConfirmConnection(connection);
+                } finally {
+                  setFeedbackLoading(null);
+                }
+              }}
+              disabled={feedbackLoading !== null}
+            >
+              <Text style={styles.yesButtonText}>
+                {feedbackLoading === 'yes'
+                  ? 'Validation…'
+                  : 'Oui, c’est la suite'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.noButton,
+                feedbackLoading !== null && styles.disabledButton,
+              ]}
+              onPress={async () => {
+                setFeedbackLoading('no');
+                try {
+                  await onRejectConnection(connection);
+                } finally {
+                  setFeedbackLoading(null);
+                }
+              }}
+              disabled={feedbackLoading !== null}
+            >
+              <Text style={styles.noButtonText}>
+                {feedbackLoading === 'no'
+                  ? 'Enregistrement…'
+                  : 'Non, sujet différent'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.laterHint}>
+            × ferme simplement la proposition pour décider plus tard.
+          </Text>
         </View>
       ) : null}
 
@@ -215,8 +274,12 @@ export function LivingMemoryHomeCard({
               </Text>
             </View>
 
-            <TouchableOpacity onPress={onOpenMemory}>
-              <Text style={styles.seeAllText}>Tout voir</Text>
+            <TouchableOpacity
+              onPress={onSeeConnections}
+              activeOpacity={0.75}
+              accessibilityLabel="Voir toutes les connexions mémoire"
+            >
+              <Text style={styles.resumeLink}>Voir tout</Text>
             </TouchableOpacity>
           </View>
 
@@ -269,12 +332,12 @@ export function LivingMemoryHomeCard({
 const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
-    marginTop: 16,
-    gap: 12,
+    marginBottom: 16,
+    gap: 16,
   },
   connectionCard: {
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 28,
+    padding: 20,
     backgroundColor: '#F4F7FF',
     borderWidth: 1,
     borderColor: '#DDE6FF',
@@ -301,7 +364,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   connectionEyebrow: {
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '900',
     color: '#6378B8',
@@ -309,7 +372,7 @@ const styles = StyleSheet.create({
   connectionTitle: {
     marginTop: 4,
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 23,
     fontWeight: '900',
     color: '#1E293B',
   },
@@ -326,22 +389,61 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#64748B',
   },
+  connectionQuestion: {
+    marginTop: 14,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: '#334155',
+  },
   connectionText: {
-    marginTop: 12,
-    fontSize: 13,
-    lineHeight: 20,
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: '600',
     color: '#53627C',
   },
-  connectionAction: {
-    alignSelf: 'flex-start',
-    marginTop: 14,
-    paddingVertical: 4,
+  feedbackRow: {
+    marginTop: 16,
+    gap: 9,
   },
-  connectionActionText: {
-    fontSize: 13,
+  yesButton: {
+    minHeight: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: '#3156D3',
+  },
+  yesButtonText: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#3156D3',
+    color: '#FFFFFF',
+  },
+  noButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9E2F2',
+  },
+  noButtonText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#475569',
+  },
+  disabledButton: {
+    opacity: 0.55,
+  },
+  laterHint: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#7C8AA0',
   },
   loadingCard: {
     flexDirection: 'row',
@@ -356,13 +458,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#5F6F85',
   },
   resumeCard: {
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 28,
+    padding: 20,
     backgroundColor: 'rgba(255,255,255,0.96)',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -372,8 +474,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  resumeLink: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2563EB',
+  },
   resumeEyebrow: {
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 0.8,
     fontWeight: '900',
     color: '#8B5CF6',
@@ -384,17 +491,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#1E293B',
   },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#5B5BD6',
-  },
   resumeIntro: {
     marginTop: 8,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#5F6F85',
   },
   resumeList: {
     marginTop: 12,
@@ -404,37 +506,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
-    padding: 12,
+    minHeight: 82,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     backgroundColor: '#F8FAFC',
   },
   kindPill: {
-    minWidth: 64,
+    width: 96,
+    minWidth: 96,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 6,
     backgroundColor: '#EEF2FF',
   },
   kindPillText: {
-    fontSize: 9,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '900',
     color: '#5B5BD6',
   },
   resumeItemText: {
     flex: 1,
-    marginLeft: 11,
+    marginLeft: 12,
   },
   resumeItemTitle: {
-    fontSize: 14,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
     color: '#1E293B',
   },
   resumeItemDescription: {
     marginTop: 3,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: '#5F6F85',
   },
   chevron: {
     marginLeft: 8,

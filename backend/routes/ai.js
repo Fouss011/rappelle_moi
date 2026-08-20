@@ -13,6 +13,12 @@ const {
 } = require('../services/relatedNotesService');
 
 const {
+  saveConnectionFeedback,
+  getConfirmedCluster,
+  listConfirmedConnectionClusters,
+} = require('../services/memoryConnectionService');
+
+const {
   detectPatterns,
 } = require('../services/patternService');
 
@@ -87,11 +93,115 @@ router.post(
 
       return res.json({
         success: true,
+        sourceNoteId:
+          typeof excludeNoteId === 'string'
+            ? excludeNoteId
+            : '',
         ...result,
       });
     } catch (error) {
       console.error(
         'Erreur notes liées :',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+
+router.post(
+  '/memory-connections/feedback',
+  requireUser,
+  async (req, res) => {
+    try {
+      const {
+        sourceNoteId,
+        relatedNoteIds,
+        status,
+      } = req.body ?? {};
+
+      const result = await saveConnectionFeedback({
+        userId: req.user.id,
+        sourceNoteId,
+        relatedNoteIds,
+        status,
+      });
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      console.error(
+        'Erreur validation connexion mémoire :',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+router.post(
+  '/memory-connections/cluster',
+  requireUser,
+  async (req, res) => {
+    try {
+      const noteIds = Array.isArray(req.body?.noteIds)
+        ? req.body.noteIds
+        : [];
+
+      const clusterNoteIds =
+        await getConfirmedCluster({
+          userId: req.user.id,
+          noteIds,
+        });
+
+      return res.json({
+        success: true,
+        noteIds: clusterNoteIds,
+      });
+    } catch (error) {
+      console.error(
+        'Erreur lecture fil mémoire confirmé :',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+
+
+router.get(
+  '/memory-connections',
+  requireUser,
+  async (req, res) => {
+    try {
+      const connections =
+        await listConfirmedConnectionClusters({
+          userId: req.user.id,
+        });
+
+      return res.json({
+        success: true,
+        connections,
+      });
+    } catch (error) {
+      console.error(
+        'Erreur liste connexions mémoire :',
         error
       );
 

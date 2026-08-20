@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
-    padding: 18,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E7EDF5',
@@ -151,15 +151,15 @@ const styles = StyleSheet.create({
 
   subtitle: {
     marginTop: 3,
-    color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 17,
+    color: '#8190A6',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '700',
   },
 
   link: {
     color: '#2563EB',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
   },
 
@@ -175,8 +175,9 @@ const styles = StyleSheet.create({
 
   emptyText: {
     marginTop: 4,
-    color: '#64748B',
-    fontSize: 13,
+    color: '#5F6F85',
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '700',
   },
 
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
 
   dateText: {
     color: '#2563EB',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     textTransform: 'capitalize',
   },
@@ -215,16 +216,16 @@ const styles = StyleSheet.create({
 
   reminderText: {
     marginTop: 3,
-    color: '#64748B',
-    fontSize: 13,
-    lineHeight: 19,
+    color: '#5F6F85',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '700',
   },
 
   info: {
     marginTop: 6,
     color: '#EA580C',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
   },
 });

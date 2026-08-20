@@ -47,6 +47,7 @@ type NotesContextValue = {
   saving: boolean;
   addNote: () => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
+  updateNote: (id: string, text: string) => Promise<boolean>;
   toggleDone: (id: string) => Promise<void>;
   toggleImportant: (id: string) => Promise<void>;
   scheduledReminders: Note[];
@@ -493,8 +494,10 @@ export function NotesProvider({
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [saving, setSaving] = useState(false);
-  const [lastMemoryConnection, setLastMemoryConnection] =
-    useState<MemoryConnection | null>(null);
+  const [
+    lastMemoryConnection,
+    setLastMemoryConnection,
+  ] = useState<MemoryConnection | null>(null);
 
   const { user, session } = useAuth();
 
@@ -898,10 +901,12 @@ if (detected) {
       }
 
       refreshMemoryInBackground();
+
       connectNewNoteToMemory(
         cleanText,
         newNote.id
       );
+
       setNote('');
     } catch (error) {
       console.error(
@@ -920,6 +925,123 @@ if (detected) {
     user,
     session?.access_token,
   ]);
+
+
+  const updateNote = useCallback(
+    async (id: string, nextText: string) => {
+      const cleanText = nextText.trim();
+
+      if (!cleanText || !user) {
+        return false;
+      }
+
+      const currentNote = notes.find(
+        (item) => item.id === id
+      );
+
+      if (!currentNote) {
+        return false;
+      }
+
+      const nextTitle = normalizeGeneratedTitle(
+        undefined,
+        cleanText
+      );
+
+      const nextCategory =
+        currentNote.type === 'reminder'
+          ? 'rappel'
+          : detectCategory(cleanText);
+
+      let nextNotificationId =
+        currentNote.notificationId;
+
+      if (
+        currentNote.type === 'reminder' &&
+        currentNote.reminderAtIso &&
+        new Date(currentNote.reminderAtIso).getTime() >
+          Date.now()
+      ) {
+        if (
+          Platform.OS !== 'web' &&
+          currentNote.notificationId
+        ) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(
+              currentNote.notificationId
+            );
+          } catch (error) {
+            console.warn(
+              "Impossible d'annuler l'ancienne notification pendant l'édition :",
+              error
+            );
+          }
+        }
+
+        try {
+          nextNotificationId =
+            await scheduleLocalPersonalReminder({
+              noteId: currentNote.id,
+              title: nextTitle,
+              text: cleanText,
+              reminderDate: new Date(
+                currentNote.reminderAtIso
+              ),
+            });
+        } catch (error) {
+          console.warn(
+            "Impossible de reprogrammer la notification après l'édition :",
+            error
+          );
+        }
+      }
+
+      const updatedNote: Note = {
+        ...currentNote,
+        title: nextTitle,
+        text: cleanText,
+        category: nextCategory,
+        notificationId: nextNotificationId,
+      };
+
+      setNotes((currentNotes) =>
+        currentNotes.map((item) =>
+          item.id === id ? updatedNote : item
+        )
+      );
+
+      const { error } = await supabase
+        .from('notes')
+        .update({
+          title: nextTitle,
+          text: cleanText,
+          category: nextCategory,
+          notification_id:
+            nextNotificationId ?? null,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error(
+          'Erreur pendant la modification de la note :',
+          error.message
+        );
+
+        setNotes((currentNotes) =>
+          currentNotes.map((item) =>
+            item.id === id ? currentNote : item
+          )
+        );
+
+        return false;
+      }
+
+      refreshMemoryInBackground();
+      return true;
+    },
+    [notes, refreshMemoryInBackground, user]
+  );
 
   const deleteNote = useCallback(
     async (id: string) => {
@@ -1245,6 +1367,7 @@ if (detected) {
         saving,
         addNote,
         deleteNote,
+        updateNote,
         toggleDone,
         toggleImportant,
         scheduledReminders,

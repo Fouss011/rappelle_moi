@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -174,7 +175,11 @@ function groupReminders(items: Note[]): ReminderGroup[] {
 }
 
 export default function RemindersScreen() {
-  const { notes, toggleDone } = useNotes();
+  const { notes, toggleDone, updateNote } = useNotes();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const reminderGroups = useMemo(() => {
     const activeReminders = notes.filter(
@@ -289,20 +294,61 @@ export default function RemindersScreen() {
                       {item.title}
                     </Text>
 
-                    <Text style={styles.text}>
-                      {item.text}
-                    </Text>
+                    {editingId === item.id ? (
+                      <View style={styles.editBox}>
+                        <TextInput
+                          style={styles.editInput}
+                          value={editingText}
+                          onChangeText={setEditingText}
+                          multiline
+                          autoFocus
+                          placeholder="Modifier ce rappel..."
+                          placeholderTextColor="#94A3B8"
+                        />
+                        <Text style={styles.editHint}>L’heure du rappel reste inchangée.</Text>
+                        <View style={styles.editActions}>
+                          <TouchableOpacity
+                            style={styles.cancelEditButton}
+                            onPress={() => { setEditingId(null); setEditingText(''); }}
+                            disabled={savingEdit}
+                          >
+                            <Text style={styles.cancelEditText}>Annuler</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.saveEditButton}
+                            onPress={async () => {
+                              if (!editingText.trim()) return;
+                              setSavingEdit(true);
+                              const success = await updateNote(item.id, editingText);
+                              setSavingEdit(false);
+                              if (success) { setEditingId(null); setEditingText(''); }
+                            }}
+                            disabled={savingEdit}
+                          >
+                            <Text style={styles.saveEditText}>
+                              {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.text}>{item.text}</Text>
+                    )}
 
-                    <TouchableOpacity
-                      style={styles.doneButton}
-                      onPress={() =>
-                        void toggleDone(item.id)
-                      }
-                    >
-                      <Text style={styles.doneText}>
-                        Terminer
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={styles.reminderActions}>
+                      <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => { setEditingId(item.id); setEditingText(item.text); }}
+                      >
+                        <Text style={styles.editButtonText}>Modifier</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.doneButton}
+                        onPress={() => void toggleDone(item.id)}
+                      >
+                        <Text style={styles.doneText}>Terminer</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })}
@@ -432,7 +478,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     textAlign: 'center',
     textAlignVertical: 'center',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     color: '#2563EB',
     backgroundColor: '#EFF6FF',
@@ -469,7 +515,7 @@ const styles = StyleSheet.create({
   },
 
   overdueBadge: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: '#DC2626',
     backgroundColor: '#FEE2E2',
@@ -488,10 +534,10 @@ const styles = StyleSheet.create({
 
   text: {
   marginTop: 5,
-  fontSize: 14,
-  lineHeight: 21,
+  fontSize: 15,
+  lineHeight: 22,
   fontWeight: '700',
-  color: '#64748B',
+  color: '#5F6F85',
 },
 
   doneButton: {
@@ -504,8 +550,23 @@ const styles = StyleSheet.create({
   },
 
   doneText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
     color: '#16A34A',
   },
+  reminderActions: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  editButton: { alignSelf: 'flex-start', backgroundColor: '#EFF6FF', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 9 },
+  editButtonText: { fontSize: 14, fontWeight: '900', color: '#2563EB' },
+  editBox: { marginTop: 10 },
+  editInput: {
+    minHeight: 105, borderRadius: 16, borderWidth: 1, borderColor: '#DCE6F5', backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, lineHeight: 22, color: '#0F172A', textAlignVertical: 'top',
+  },
+  editHint: { marginTop: 7, fontSize: 13, fontWeight: '700', color: '#94A3B8' },
+  editActions: { marginTop: 10, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cancelEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1F5F9' },
+  cancelEditText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
+  saveEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#2563EB' },
+  saveEditText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+
 });
