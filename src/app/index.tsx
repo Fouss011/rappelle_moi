@@ -1,639 +1,525 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  AppState,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBackground } from '../components/AppBackground';
-import { Note, useNotes } from '../context/NotesContext';
+import { FloatingMemoryButton } from '../components/FloatingMemoryButton';
+import { HeroCard } from '../components/HeroCard';
+import { HomeMenu } from '../components/HomeMenu';
+import type { LivingMemoryResumeItem } from '../components/LivingMemoryHomeCard';
+import { LivingMemoryHomeCard } from '../components/LivingMemoryHomeCard';
+import { MemoryAssistantSheet } from '../components/MemoryAssistantSheet';
+import { NextReminderCard } from '../components/NextReminderCard';
+import { QuickCaptureCard } from '../components/QuickCaptureCard';
+import { RecentNotesPreview } from '../components/RecentNotesPreview';
+import { RecurringReminderSuggestionCard } from '../components/RecurringReminderSuggestionCard';
+import { useAuth } from '../context/AuthContext';
+import { useNotes } from '../context/NotesContext';
+import {
+  listenForPushTokenChanges,
+  registerPushTokenForUser,
+} from '../services/pushTokenService';
+import type { MemoryConnection } from '../services/relatedNotesService';
+import {
+  saveMemoryConnectionFeedback,
+} from '../services/relatedNotesService';
 
-type ReminderGroup = {
-  key: string;
-  title: string;
-  date: Date;
-  items: Note[];
-  isOverdue: boolean;
-};
-
-function startOfDay(date: Date) {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function getDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    '0'
-  )}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function getReminderDayLabel(date: Date) {
-  const today = startOfDay(new Date());
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  const target = startOfDay(date);
-
-  if (target.getTime() === today.getTime()) {
-    return `Aujourd'hui — ${date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-    })}`;
-  }
-
-  if (target.getTime() === tomorrow.getTime()) {
-    return `Demain — ${date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-    })}`;
-  }
-
-  if (target.getTime() === yesterday.getTime()) {
-    return `Hier — ${date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-    })}`;
-  }
-
-  return date.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year:
-      date.getFullYear() !== today.getFullYear()
-        ? 'numeric'
-        : undefined,
-  });
-}
-
-function formatReminderTime(dateIso: string) {
-  const date = new Date(dateIso);
-
-  if (Number.isNaN(date.getTime())) {
-    return '--:--';
-  }
-
-  return date.toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function groupReminders(items: Note[]): ReminderGroup[] {
-  const now = new Date();
-  const groups = new Map<string, ReminderGroup>();
-
-  items.forEach((item) => {
-    if (!item.reminderAtIso) {
-      return;
-    }
-
-    const reminderDate = new Date(item.reminderAtIso);
-
-    if (Number.isNaN(reminderDate.getTime())) {
-      return;
-    }
-
-    const key = getDateKey(reminderDate);
-
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        title: getReminderDayLabel(reminderDate),
-        date: startOfDay(reminderDate),
-        items: [],
-        isOverdue:
-          reminderDate.getTime() < now.getTime(),
-      });
-    }
-
-    const group = groups.get(key);
-
-    if (group) {
-      group.items.push(item);
-
-      if (reminderDate.getTime() < now.getTime()) {
-        group.isOverdue = true;
-      }
-    }
-  });
-
-  return Array.from(groups.values())
-    .sort((a, b) => {
-      /**
-       * Les journées contenant des rappels futurs
-       * passent avant les journées entièrement dépassées.
-       */
-      if (a.isOverdue !== b.isOverdue) {
-        return a.isOverdue ? 1 : -1;
-      }
-
-      /**
-       * Rappels à venir :
-       * la date la plus proche en premier.
-       */
-      if (!a.isOverdue && !b.isOverdue) {
-        return a.date.getTime() - b.date.getTime();
-      }
-
-      /**
-       * Rappels dépassés :
-       * le plus récent en premier.
-       */
-      return b.date.getTime() - a.date.getTime();
-    })
-    .map((group) => ({
-      ...group,
-
-      items: [...group.items].sort((a, b) => {
-        const dateA = new Date(
-          a.reminderAtIso ?? ''
-        ).getTime();
-
-        const dateB = new Date(
-          b.reminderAtIso ?? ''
-        ).getTime();
-
-        if (group.isOverdue) {
-          return dateB - dateA;
-        }
-
-        return dateA - dateB;
-      }),
-    }));
-}
-
-export default function RemindersScreen() {
+export default function HomeScreen() {
   const {
-    notes,
-    toggleDone,
-    updateNote,
-    recurringReminders,
+    user,
+    profile,
+    session,
+    loading,
+    refreshProfile,
+  } = useAuth();
+  const [memoryOpen, setMemoryOpen] = useState(false);
+
+  const {
+    note,
+    setNote,
+    addNote,
+    saving,
+    scheduledReminders,
+    pendingNotes,
+    lastMemoryConnection,
+    dismissMemoryConnection,
+    recurringReminderSuggestion,
+    confirmRecurringReminderSuggestion,
+    dismissRecurringReminderSuggestion,
   } = useNotes();
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState('');
-  const [savingEdit, setSavingEdit] = useState(false);
+  const hasSavedContent =
+    pendingNotes.length > 0 ||
+    scheduledReminders.length > 0;
 
-  const reminderGroups = useMemo(() => {
-    const activeReminders = notes.filter(
-      (item) =>
-        item.type === 'reminder' &&
-        !item.isDone &&
-        Boolean(item.reminderAtIso)
+  /**
+   * Redirige l’utilisateur vers la connexion uniquement
+   * lorsque la restauration de session est terminée.
+   */
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user]);
+
+ useEffect(() => {
+  if (!user?.id) {
+    return;
+  }
+
+  const userId = user.id;
+
+  let lastPushSyncAt = 0;
+  let syncRunning = false;
+
+  async function syncPushToken(force = false) {
+    if (syncRunning) {
+      return;
+    }
+
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (
+      !force &&
+      now - lastPushSyncAt < fiveMinutes
+    ) {
+      return;
+    }
+
+    syncRunning = true;
+
+    try {
+      const result =
+        await registerPushTokenForUser(userId);
+
+      if (result.success) {
+        lastPushSyncAt = Date.now();
+
+        console.log(
+          '✅ Push Daya synchronisé.'
+        );
+      } else {
+        console.warn(
+          "Le push Daya n'a pas pu être synchronisé :",
+          result.error
+        );
+      }
+    } finally {
+      syncRunning = false;
+    }
+  }
+
+  /**
+   * Vérifie le token dès que la session
+   * utilisateur est disponible.
+   */
+  void syncPushToken(true);
+
+  /**
+   * Si Expo change le token pendant que
+   * l'application fonctionne, on le
+   * resynchronise automatiquement.
+   */
+  const pushTokenSubscription =
+    listenForPushTokenChanges(userId);
+
+  /**
+   * Quand Daya revient au premier plan,
+   * on recharge le profil et on vérifie
+   * de nouveau le token push.
+   */
+  const appStateSubscription =
+    AppState.addEventListener(
+      'change',
+      (state) => {
+        if (state !== 'active') {
+          return;
+        }
+
+        void refreshProfile();
+        void syncPushToken();
+      }
     );
 
-    return groupReminders(activeReminders);
-  }, [notes]);
+  return () => {
+    pushTokenSubscription?.remove();
+    appStateSubscription.remove();
+  };
+}, [
+  user?.id,
+  refreshProfile,
+]);
 
-  const total = reminderGroups.reduce(
-    (sum, group) => sum + group.items.length,
-    0
-  );
+
+  /**
+   * On n’affiche plus null pendant le chargement.
+   * Cela évite l’écran noir après la connexion ou au redémarrage.
+   */
+  if (loading) {
+    return <LoadingScreen message="Chargement de Daya..." />;
+  }
+
+  /**
+   * Pendant que router.replace() redirige vers /login,
+   * on garde un écran visible au lieu d’un écran noir.
+   */
+  if (!user) {
+    return <LoadingScreen message="Ouverture de la connexion..." />;
+  }
 
   return (
-    <AppBackground>
-     <SafeAreaView
+  <View style={styles.screen}>
+    <Image
+      source={require('../../assets/images/background.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    />
+
+    <View style={styles.backgroundOverlay} />
+
+    <SafeAreaView
       style={styles.container}
       edges={['top', 'left', 'right']}
     >
+      <HomeMenu
+  onOpenNotes={() => router.push('/notes')}
+  onOpenReminders={() => router.push('/reminders')}
+  onOpenMemory={() => router.push('/memory')}
+  onOpenArchives={() => router.push('/archives')}
+  onOpenSettings={() => router.push('/settings')}
+/>
+
       <ScrollView
-        contentContainerStyle={styles.content}
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backText}>← Retour</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Mes rappels</Text>
-
-        <Text style={styles.subtitle}>
-          Tes rappels sont classés selon leur date prévue.
-        </Text>
-
-        <View style={styles.summary}>
-          <Text style={styles.summaryValue}>{total}</Text>
-
-          <Text style={styles.summaryText}>
-            rappel{total > 1 ? 's' : ''} à suivre
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.recurringShortcut}
-          onPress={() =>
-            router.push('/recurring-reminders' as never)
+        <HeroCard
+          userName={
+            profile?.first_name ||
+            user.email?.split('@')[0] ||
+            'Utilisateur'
           }
-          activeOpacity={0.8}
-        >
-          <View style={styles.recurringShortcutText}>
-            <Text style={styles.recurringShortcutTitle}>
-              ↻ Rappels récurrents
+        />
+
+        <QuickCaptureCard
+          note={note}
+          setNote={setNote}
+          onAddNote={addNote}
+          loading={saving}
+        />
+
+        <LivingMemoryHomeCard
+          accessToken={session?.access_token}
+          connection={lastMemoryConnection}
+          onDismissConnection={dismissMemoryConnection}
+          onConfirmConnection={async (connection: MemoryConnection) => {
+            const accessToken = session?.access_token;
+
+            if (!accessToken || !connection.sourceNoteId) {
+              console.warn(
+                'Connexion mémoire impossible à valider : session ou note source manquante.'
+              );
+              return;
+            }
+
+            const relatedNoteIds = connection.relatedNotes.map(
+              (item) => item.id
+            );
+
+            const result = await saveMemoryConnectionFeedback({
+              accessToken,
+              sourceNoteId: connection.sourceNoteId,
+              relatedNoteIds,
+              status: 'confirmed',
+            });
+
+            if (!result.success) {
+              console.warn(
+                'La connexion mémoire n’a pas pu être validée :',
+                result.error
+              );
+              return;
+            }
+
+            dismissMemoryConnection();
+
+            router.push({
+              pathname: '/memory-topic',
+              params: {
+                source: 'connection',
+                title:
+                  connection.title ||
+                  'Cette idée a une histoire',
+                description:
+                  connection.explanation || '',
+                noteIds: [
+                  connection.sourceNoteId,
+                  ...relatedNoteIds,
+                ].join(','),
+              },
+            } as never);
+          }}
+          onRejectConnection={async (connection: MemoryConnection) => {
+            const accessToken = session?.access_token;
+
+            if (!accessToken || !connection.sourceNoteId) {
+              dismissMemoryConnection();
+              return;
+            }
+
+            const result = await saveMemoryConnectionFeedback({
+              accessToken,
+              sourceNoteId: connection.sourceNoteId,
+              relatedNoteIds: connection.relatedNotes.map(
+                (item) => item.id
+              ),
+              status: 'rejected',
+            });
+
+            if (!result.success) {
+              console.warn(
+                'Le rejet de la connexion mémoire n’a pas pu être enregistré :',
+                result.error
+              );
+              return;
+            }
+
+            dismissMemoryConnection();
+          }}
+          onOpenResumeItem={(item: LivingMemoryResumeItem) => {
+            router.push({
+              pathname: '/memory-topic',
+              params: {
+                source: 'memory',
+                kind: item.kind,
+                label: item.label,
+              },
+            } as never);
+          }}
+          onSeeConnections={() => {
+            router.push('/memory-connections');
+          }}
+        />
+
+        {!hasSavedContent ? (
+          <View style={styles.emptyGuideCard}>
+            <Text style={styles.emptyGuideEmoji}>
+              💡
             </Text>
-            <Text style={styles.recurringShortcutSubtitle}>
-              {recurringReminders.length === 0
-                ? 'Aucune habitude automatisée pour le moment.'
-                : `${recurringReminders.length} rappel${
-                    recurringReminders.length > 1 ? 's' : ''
-                  } récurrent${
-                    recurringReminders.length > 1 ? 's' : ''
-                  } à gérer.`}
-            </Text>
-          </View>
-          <Text style={styles.recurringChevron}>›</Text>
-        </TouchableOpacity>
 
-        {total === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>
-              Aucun rappel actif
+            <Text style={styles.emptyGuideTitle}>
+              Commencez simplement
             </Text>
 
-            <Text style={styles.emptyText}>
-              Exemple : « Appeler Rachel demain à 18 h ».
+            <Text style={styles.emptyGuideText}>
+              Notez une idée pour ne plus l’oublier, ou écrivez
+              un rappel avec une heure précise.
             </Text>
-          </View>
-        ) : (
-          reminderGroups.map((group) => (
-            <View key={group.key} style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    group.isOverdue &&
-                      styles.overdueSectionTitle,
-                  ]}
-                >
-                  {group.title}
-                </Text>
 
-                <Text style={styles.sectionCount}>
-                  {group.items.length}
-                </Text>
-              </View>
+            <View style={styles.emptyGuideExample}>
+              <Text style={styles.emptyGuideExampleLabel}>
+                Exemple
+              </Text>
 
-              {group.items.map((item) => {
-                const isOverdue =
-                  item.reminderAtIso &&
-                  new Date(item.reminderAtIso).getTime() <
-                    Date.now();
-
-                return (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.card,
-                      isOverdue && styles.overdueCard,
-                    ]}
-                  >
-                    <View style={styles.reminderHeader}>
-                      <Text
-                        style={[
-                          styles.time,
-                          isOverdue && styles.overdueTime,
-                        ]}
-                      >
-                        {formatReminderTime(
-                          item.reminderAtIso ?? ''
-                        )}
-                      </Text>
-
-                      {isOverdue && (
-                        <Text style={styles.overdueBadge}>
-                          En retard
-                        </Text>
-                      )}
-                    </View>
-                    
-                    <Text style={styles.reminderTitle}>
-                      {item.title}
-                    </Text>
-
-                    {editingId === item.id ? (
-                      <View style={styles.editBox}>
-                        <TextInput
-                          style={styles.editInput}
-                          value={editingText}
-                          onChangeText={setEditingText}
-                          multiline
-                          autoFocus
-                          placeholder="Modifier ce rappel..."
-                          placeholderTextColor="#94A3B8"
-                        />
-                        <Text style={styles.editHint}>L’heure du rappel reste inchangée.</Text>
-                        <View style={styles.editActions}>
-                          <TouchableOpacity
-                            style={styles.cancelEditButton}
-                            onPress={() => { setEditingId(null); setEditingText(''); }}
-                            disabled={savingEdit}
-                          >
-                            <Text style={styles.cancelEditText}>Annuler</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.saveEditButton}
-                            onPress={async () => {
-                              if (!editingText.trim()) return;
-                              setSavingEdit(true);
-                              const success = await updateNote(item.id, editingText);
-                              setSavingEdit(false);
-                              if (success) { setEditingId(null); setEditingText(''); }
-                            }}
-                            disabled={savingEdit}
-                          >
-                            <Text style={styles.saveEditText}>
-                              {savingEdit ? 'Enregistrement…' : 'Enregistrer'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ) : (
-                      <Text style={styles.text}>{item.text}</Text>
-                    )}
-
-                    <View style={styles.reminderActions}>
-                      <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={() => { setEditingId(item.id); setEditingText(item.text); }}
-                      >
-                        <Text style={styles.editButtonText}>Modifier</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.doneButton}
-                        onPress={() => void toggleDone(item.id)}
-                      >
-                        <Text style={styles.doneText}>Terminer</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
+              <Text style={styles.emptyGuideExampleText}>
+                « Rappelle-moi d’appeler Rachel demain à 18 h »
+              </Text>
             </View>
-          ))
-        )}
+          </View>
+        ) : null}
+
+        <RecentNotesPreview
+          notes={pendingNotes
+            .filter((item) => item.type === 'note')
+            .slice(0, 3)}
+          onSeeAll={() => router.push('/notes')}
+        />
+
+        {recurringReminderSuggestion ? (
+          <RecurringReminderSuggestionCard
+            suggestion={recurringReminderSuggestion}
+            onConfirm={confirmRecurringReminderSuggestion}
+            onDismiss={dismissRecurringReminderSuggestion}
+          />
+        ) : null}
+
+        <NextReminderCard
+          reminders={scheduledReminders}
+          onSeeAll={() => router.push('/reminders')}
+        />
       </ScrollView>
+
+      <FloatingMemoryButton
+        onPress={() => setMemoryOpen(true)}
+      />
+
+      <MemoryAssistantSheet
+        visible={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+      />
     </SafeAreaView>
-  </AppBackground>
+  </View>
+);
+}
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={styles.loadingContainer}>
+      <View style={styles.loadingCard}>
+        <ActivityIndicator size="large" />
+
+        <Text style={styles.loadingTitle}>Daya</Text>
+
+        <Text style={styles.loadingText}>{message}</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+
+  screen: {
   flex: 1,
+  width: '100%',
+  overflow: 'hidden',
+  backgroundColor: '#F6F8FC',
+},
+
+backgroundImage: {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+},
+
+backgroundOverlay: {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  backgroundColor: 'rgba(246, 248, 252, 0.82)',
+},
+
+container: {
+  flex: 1,
+  width: '100%',
   backgroundColor: 'transparent',
 },
 
-  content: {
-    padding: 22,
-    paddingBottom: 50,
-  },
+scrollView: {
+  flex: 1,
+  width: '100%',
+},
 
-  backButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-    marginBottom: 18,
-  },
+content: {
+  width: '100%',
+  paddingHorizontal: 22,
+  paddingTop: 90,
+  paddingBottom: 150,
+},
 
-  backText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-
-  title: {
-    fontSize: 34,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-
-  subtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-
-  summary: {
-    marginTop: 20,
-    marginBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-  },
-
-  summaryValue: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#2563EB',
-  },
-
-  summaryText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#64748B',
-  },
-
-  emptyBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#E6ECF5',
-  },
-
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-
-  emptyText: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-
-  section: {
-    marginBottom: 20,
-  },
-
-  sectionHeader: {
-    marginBottom: 10,
-    flexDirection: 'row',
+  emptyGuideCard: {
+    marginTop: 0,
+    marginBottom: 16,
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  sectionTitle: {
-    flex: 1,
-    paddingRight: 12,
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#2563EB',
-    textTransform: 'capitalize',
-  },
-
-  overdueSectionTitle: {
-    color: '#DC2626',
-  },
-
-  sectionCount: {
-    minWidth: 28,
-    height: 28,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#2563EB',
-    backgroundColor: '#EFF6FF',
-  },
-
-  card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 16,
-    marginBottom: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
     borderWidth: 1,
-    borderColor: '#E6ECF5',
+    borderColor: 'rgba(226, 232, 240, 0.9)',
   },
 
-  overdueCard: {
-    borderColor: '#FECACA',
-    backgroundColor: '#FFF8F8',
+  emptyGuideEmoji: {
+    fontSize: 28,
   },
 
-  reminderHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  time: {
-    fontSize: 24,
+  emptyGuideTitle: {
+    marginTop: 10,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#2563EB',
+    color: '#1E293B',
   },
 
-  overdueTime: {
-    color: '#DC2626',
-  },
-
-  overdueBadge: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#DC2626',
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-
-  reminderTitle: {
-  marginTop: 10,
-  fontSize: 17,
-  lineHeight: 23,
-  fontWeight: '900',
-  color: '#0F172A',
-},
-
-  text: {
-  marginTop: 5,
-  fontSize: 15,
-  lineHeight: 22,
-  fontWeight: '700',
-  color: '#5F6F85',
-},
-
-  doneButton: {
-    marginTop: 14,
-    alignSelf: 'flex-start',
-    backgroundColor: '#ECFDF5',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-
-  doneText: {
+  emptyGuideText: {
+    marginTop: 8,
+    maxWidth: 310,
     fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  emptyGuideExample: {
+    width: '100%',
+    marginTop: 16,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#F8FAFC',
+  },
+
+  emptyGuideExampleLabel: {
+    fontSize: 11,
     fontWeight: '900',
-    color: '#16A34A',
-  },
-  reminderActions: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  editButton: { alignSelf: 'flex-start', backgroundColor: '#EFF6FF', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 9 },
-  editButtonText: { fontSize: 14, fontWeight: '900', color: '#2563EB' },
-  editBox: { marginTop: 10 },
-  editInput: {
-    minHeight: 105, borderRadius: 16, borderWidth: 1, borderColor: '#DCE6F5', backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, lineHeight: 22, color: '#0F172A', textAlignVertical: 'top',
-  },
-  editHint: { marginTop: 7, fontSize: 13, fontWeight: '700', color: '#94A3B8' },
-  editActions: { marginTop: 10, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
-  cancelEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1F5F9' },
-  cancelEditText: { fontSize: 14, fontWeight: '900', color: '#64748B' },
-  saveEditButton: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#2563EB' },
-  saveEditText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
-
-
-
-  recurringShortcut: {
-    marginBottom: 18,
-    borderRadius: 22,
-    paddingHorizontal: 17,
-    paddingVertical: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#94A3B8',
   },
 
-  recurringShortcutText: {
-    flex: 1,
-  },
-
-  recurringShortcutTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '900',
-    color: '#1D4ED8',
-  },
-
-  recurringShortcutSubtitle: {
-    marginTop: 3,
+  emptyGuideExampleText: {
+    marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#334155',
   },
 
-  recurringChevron: {
-    marginLeft: 10,
-    fontSize: 26,
-    color: '#60A5FA',
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#F6F8FC',
+  },
+
+  loadingCard: {
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    backgroundColor: '#FFFFFF',
+  },
+
+  loadingTitle: {
+    marginTop: 18,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#64748B',
   },
 });

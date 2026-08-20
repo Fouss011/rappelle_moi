@@ -4,7 +4,7 @@ import type { RecurringReminderSuggestion } from '../services/recurringReminderS
 
 type Props = {
   suggestion: RecurringReminderSuggestion;
-  onConfirm: () => Promise<void>;
+  onConfirm: () => Promise<boolean>;
   onDismiss: () => void;
   loading?: boolean;
 };
