@@ -38,12 +38,17 @@ type AuthContextValue = {
   ) => Promise<SignUpResult>;
 
   resetPassword: (
-  email: string
-) => Promise<string | null>;
+    email: string
+  ) => Promise<string | null>;
 
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+
+  updateProfileName: (
+    firstName: string
+  ) => Promise<string | null>;
 };
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -62,9 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (!mountedRef.current) {
-        return;
-      }
+      if (!mountedRef.current) return;
 
       if (error) {
         console.error('Erreur de chargement du profil :', error.message);
@@ -74,7 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setProfile(data ?? null);
     } catch (error) {
-      console.error('Erreur inattendue pendant le chargement du profil :', error);
+      console.error(
+        'Erreur inattendue pendant le chargement du profil :',
+        error
+      );
 
       if (mountedRef.current) {
         setProfile(null);
@@ -101,9 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getSession();
 
-        if (!mountedRef.current) {
-          return;
-        }
+        if (!mountedRef.current) return;
 
         if (error) {
           console.error(
@@ -150,11 +154,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      /**
-       * Important :
-       * ne pas lancer directement une requête Supabase asynchrone
-       * dans le callback onAuthStateChange.
-       */
       const newUser = newSession?.user ?? null;
 
       setSession(newSession);
@@ -166,9 +165,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      /**
-       * On sort la requête de profil du callback Supabase.
-       */
       setTimeout(() => {
         if (mountedRef.current) {
           void loadProfile(newUser.id);
@@ -194,9 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
         });
 
-        if (error) {
-          return error.message;
-        }
+        if (error) return error.message;
 
         const newSession = data.session ?? null;
         const newUser = data.user ?? null;
@@ -213,7 +207,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       } catch (error) {
         console.error('Erreur inattendue pendant la connexion :', error);
-
         return 'Une erreur inattendue est survenue pendant la connexion.';
       } finally {
         if (mountedRef.current) {
@@ -224,155 +217,175 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loadProfile]
   );
 
- const signUp = useCallback(
-  async (
-    firstName: string,
-    email: string,
-    password: string
-  ): Promise<SignUpResult> => {
-    try {
-      setLoading(true);
+  const signUp = useCallback(
+    async (
+      firstName: string,
+      email: string,
+      password: string
+    ): Promise<SignUpResult> => {
+      try {
+        setLoading(true);
 
-      const cleanFirstName =
-        firstName.trim();
+        const cleanFirstName = firstName.trim();
+        const cleanEmail = email.trim().toLowerCase();
 
-      const cleanEmail =
-        email.trim().toLowerCase();
-
-      const { data, error } =
-        await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
-
           options: {
             data: {
-              first_name:
-                cleanFirstName,
+              first_name: cleanFirstName,
             },
           },
         });
 
-      if (error) {
-        return {
-          error: error.message,
-          requiresEmailConfirmation:
-            false,
-        };
-      }
-
-      const newUser =
-        data.user ?? null;
-
-      const newSession =
-        data.session ?? null;
-
-      if (!newUser?.id) {
-        return {
-          error:
-            "Le compte a été créé, mais l'utilisateur n'a pas été retourné.",
-          requiresEmailConfirmation:
-            false,
-        };
-      }
-
-      /**
-       * Si la confirmation d’email est activée,
-       * le compte existe mais aucune session
-       * n’est encore ouverte.
-       */
-      if (!newSession) {
-        if (mountedRef.current) {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
+        if (error) {
+          return {
+            error: error.message,
+            requiresEmailConfirmation: false,
+          };
         }
+
+        const newUser = data.user ?? null;
+        const newSession = data.session ?? null;
+
+        if (!newUser?.id) {
+          return {
+            error:
+              "Le compte a été créé, mais l'utilisateur n'a pas été retourné.",
+            requiresEmailConfirmation: false,
+          };
+        }
+
+        if (!newSession) {
+          if (mountedRef.current) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+          }
+
+          return {
+            error: null,
+            requiresEmailConfirmation: true,
+          };
+        }
+
+        if (mountedRef.current) {
+          setSession(newSession);
+          setUser(newUser);
+        }
+
+        await loadProfile(newUser.id);
 
         return {
           error: null,
-          requiresEmailConfirmation:
-            true,
+          requiresEmailConfirmation: false,
         };
+      } catch (error) {
+        console.error(
+          'Erreur inattendue pendant la création du compte :',
+          error
+        );
+
+        return {
+          error:
+            'Une erreur inattendue est survenue pendant la création du compte.',
+          requiresEmailConfirmation: false,
+        };
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
+    },
+    [loadProfile]
+  );
 
-      if (mountedRef.current) {
-        setSession(newSession);
-        setUser(newUser);
-      }
+  const resetPassword = useCallback(
+    async (email: string): Promise<string | null> => {
+      try {
+        setLoading(true);
 
-      await loadProfile(newUser.id);
+        const cleanEmail = email.trim().toLowerCase();
 
-      return {
-        error: null,
-        requiresEmailConfirmation:
-          false,
-      };
-    } catch (error) {
-      console.error(
-        "Erreur inattendue pendant la création du compte :",
-        error
-      );
+        if (!cleanEmail) {
+          return 'Entre ton adresse email.';
+        }
 
-      return {
-        error:
-          'Une erreur inattendue est survenue pendant la création du compte.',
-        requiresEmailConfirmation:
-          false,
-      };
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-      }
-    }
-  },
-  [loadProfile]
-);
-
-const resetPassword = useCallback(
-  async (
-    email: string
-  ): Promise<string | null> => {
-    try {
-      setLoading(true);
-
-      const cleanEmail =
-        email.trim().toLowerCase();
-
-      if (!cleanEmail) {
-        return 'Entre ton adresse email.';
-      }
-
-      const { error } =
-        await supabase.auth.resetPasswordForEmail(
+        const { error } = await supabase.auth.resetPasswordForEmail(
           cleanEmail,
           {
-            redirectTo:
-              'daya://reset-password',
+            redirectTo: 'daya://reset-password',
           }
         );
 
-      if (error) {
-        return error.message;
+        if (error) return error.message;
+
+        return null;
+      } catch (error) {
+        console.error(
+          'Erreur pendant la demande de réinitialisation :',
+          error
+        );
+
+        return (
+          'Impossible d’envoyer l’email de ' +
+          'réinitialisation pour le moment.'
+        );
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  const updateProfileName = useCallback(
+    async (firstName: string): Promise<string | null> => {
+      if (!user?.id) {
+        return 'Utilisateur non connecté.';
       }
 
-      return null;
-    } catch (error) {
-      console.error(
-        'Erreur pendant la demande de réinitialisation :',
-        error
-      );
+      const cleanFirstName = firstName.trim();
 
-      return (
-        'Impossible d’envoyer l’email de ' +
-        'réinitialisation pour le moment.'
-      );
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
+      if (!cleanFirstName) {
+        return 'Entre ton prénom.';
       }
-    }
-  },
-  []
-);
+
+      if (cleanFirstName.length > 50) {
+        return 'Le prénom est trop long.';
+      }
+
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            first_name: cleanFirstName,
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error(
+            'Erreur pendant la modification du profil :',
+            error.message
+          );
+          return error.message;
+        }
+
+        await loadProfile(user.id);
+        return null;
+      } catch (error) {
+        console.error(
+          'Erreur inattendue pendant la modification du profil :',
+          error
+        );
+
+        return 'Impossible de modifier le profil pour le moment.';
+      }
+    },
+    [loadProfile, user?.id]
+  );
 
   const signOut = useCallback(async () => {
     try {
@@ -381,7 +394,10 @@ const resetPassword = useCallback(
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        console.error('Erreur pendant la déconnexion :', error.message);
+        console.error(
+          'Erreur pendant la déconnexion :',
+          error.message
+        );
       }
     } finally {
       if (mountedRef.current) {
@@ -405,6 +421,7 @@ const resetPassword = useCallback(
         resetPassword,
         signOut,
         refreshProfile,
+        updateProfileName,
       }}
     >
       {children}

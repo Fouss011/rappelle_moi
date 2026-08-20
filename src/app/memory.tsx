@@ -421,6 +421,35 @@ export default function MemoryScreen() {
               </Text>
             </View>
 
+            <TouchableOpacity
+  style={styles.connectionsCard}
+  activeOpacity={0.82}
+  onPress={() => router.push('/memory-connections')}
+>
+  <View style={styles.connectionsIcon}>
+    <Text style={styles.connectionsEmoji}>🔗</Text>
+  </View>
+
+  <View style={styles.connectionsContent}>
+    <Text style={styles.connectionsLabel}>
+      CONNEXIONS
+    </Text>
+
+    <Text style={styles.connectionsTitle}>
+      Chronologie de mes idées
+    </Text>
+
+    <Text style={styles.connectionsText}>
+      Retrouve les idées que tu as reliées et suis
+      leur évolution au fil du temps.
+    </Text>
+  </View>
+
+  <Text style={styles.connectionsChevron}>
+    ›
+  </Text>
+</TouchableOpacity>
+
             <MemorySection
               emoji="🚀"
               title="Projets actifs"
@@ -846,4 +875,65 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '600',
   },
+
+  connectionsCard: {
+  marginTop: 16,
+  paddingHorizontal: 18,
+  paddingVertical: 18,
+  borderRadius: 26,
+  borderWidth: 1,
+  borderColor: '#DDD8F8',
+  backgroundColor: '#FFFFFF',
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+connectionsIcon: {
+  width: 48,
+  height: 48,
+  borderRadius: 16,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#F1EEFF',
+},
+
+connectionsEmoji: {
+  fontSize: 22,
+},
+
+connectionsContent: {
+  flex: 1,
+  marginLeft: 14,
+  paddingRight: 10,
+},
+
+connectionsLabel: {
+  fontSize: 11,
+  letterSpacing: 0.8,
+  fontWeight: '900',
+  color: '#7C6FD0',
+},
+
+connectionsTitle: {
+  marginTop: 4,
+  fontSize: 17,
+  lineHeight: 22,
+  fontWeight: '900',
+  color: '#0F172A',
+},
+
+connectionsText: {
+  marginTop: 5,
+  fontSize: 14,
+  lineHeight: 20,
+  fontWeight: '600',
+  color: '#64748B',
+},
+
+connectionsChevron: {
+  fontSize: 28,
+  lineHeight: 30,
+  fontWeight: '500',
+  color: '#94A3B8',
+},
 });

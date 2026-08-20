@@ -1,10 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type HeroCardProps = {
   userName?: string;
+  onPress?: () => void;
 };
 
-export function HeroCard({ userName = 'Fousséni' }: HeroCardProps) {
+export function HeroCard({
+  userName = 'Utilisateur',
+  onPress,
+}: HeroCardProps) {
   const today = new Date();
 
   const dateLabel = today.toLocaleDateString('fr-FR', {
@@ -14,17 +18,40 @@ export function HeroCard({ userName = 'Fousséni' }: HeroCardProps) {
   });
 
   return (
-    <View style={styles.container}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.container,
+        pressed && onPress ? styles.containerPressed : null,
+      ]}
+    >
       <View style={styles.textBlock}>
-        <Text style={styles.greeting}>Bonjour, {userName}</Text>
-        <Text style={styles.intro}>Je suis Daya.</Text>
-        <Text style={styles.date}>{dateLabel}</Text>
+        <Text style={styles.greeting}>
+          Bonjour, {userName}
+        </Text>
+
+        <Text style={styles.intro}>
+          Je suis Daya.
+        </Text>
+
+        <Text style={styles.date}>
+          {dateLabel}
+        </Text>
       </View>
 
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>Aujourd’hui</Text>
+      <View style={styles.rightBlock}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            Aujourd’hui
+          </Text>
+        </View>
+
+        {onPress ? (
+          <Text style={styles.chevron}>›</Text>
+        ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -40,6 +67,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+
+  containerPressed: {
+    opacity: 0.82,
   },
 
   textBlock: {
@@ -67,6 +98,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
+  rightBlock: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+
   badge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 12,
@@ -78,5 +114,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     color: '#2563EB',
+  },
+
+  chevron: {
+    marginTop: 6,
+    marginRight: 4,
+    fontSize: 22,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#94A3B8',
   },
 });
